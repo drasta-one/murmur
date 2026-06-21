@@ -100,10 +100,10 @@ impl TransferTracker {
         chunk_id: ChunkId,
         node_id: NodeId,
     ) {
-        if let Some(availability) = self.global_chunk_availability.get_mut(&manifest_id) {
-            if let Some(holders) = availability.get_mut(&chunk_id) {
-                holders.remove(&node_id);
-            }
+        if let Some(availability) = self.global_chunk_availability.get_mut(&manifest_id)
+            && let Some(holders) = availability.get_mut(&chunk_id)
+        {
+            holders.remove(&node_id);
         }
     }
 
@@ -143,12 +143,11 @@ impl TransferTracker {
     }
 
     pub fn mark_chunk_received(&mut self, manifest_id: ManifestId, chunk_id: ChunkId) {
-        if let Some(progress) = self.active.get_mut(&manifest_id) {
-            if progress.chunks_pending.remove(&chunk_id)
-                || progress.chunks_in_flight.remove(&chunk_id).is_some()
-            {
-                progress.chunks_received.insert(chunk_id);
-            }
+        if let Some(progress) = self.active.get_mut(&manifest_id)
+            && (progress.chunks_pending.remove(&chunk_id)
+                || progress.chunks_in_flight.remove(&chunk_id).is_some())
+        {
+            progress.chunks_received.insert(chunk_id);
         }
     }
 
@@ -158,20 +157,20 @@ impl TransferTracker {
         chunk_id: ChunkId,
         node_id: NodeId,
     ) {
-        if let Some(progress) = self.active.get_mut(&manifest_id) {
-            if progress.chunks_pending.remove(&chunk_id) {
-                progress
-                    .chunks_in_flight
-                    .insert(chunk_id, (node_id, Instant::now()));
-            }
+        if let Some(progress) = self.active.get_mut(&manifest_id)
+            && progress.chunks_pending.remove(&chunk_id)
+        {
+            progress
+                .chunks_in_flight
+                .insert(chunk_id, (node_id, Instant::now()));
         }
     }
 
     pub fn unmark_chunk_in_flight(&mut self, manifest_id: ManifestId, chunk_id: ChunkId) {
-        if let Some(progress) = self.active.get_mut(&manifest_id) {
-            if progress.chunks_in_flight.remove(&chunk_id).is_some() {
-                progress.chunks_pending.insert(chunk_id);
-            }
+        if let Some(progress) = self.active.get_mut(&manifest_id)
+            && progress.chunks_in_flight.remove(&chunk_id).is_some()
+        {
+            progress.chunks_pending.insert(chunk_id);
         }
     }
 

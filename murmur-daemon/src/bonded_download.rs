@@ -303,22 +303,19 @@ pub async fn execute_local_fetch(
                     .get_progress(manifest_id)
                     .map(|p| p.is_complete())
                     .unwrap_or(false);
-                if is_complete {
-                    if let Some(dest) = state
+                if is_complete
+                    && let Some(dest) = state
                         .download_destinations
                         .read()
                         .await
                         .get(&manifest_id)
                         .cloned()
+                {
+                    info!("Bonded Download complete! Reassembling to {}", dest);
+                    if let Some(manifest) = state.manifests.read().await.get(&manifest_id).cloned()
+                        && let Err(e) = state.storage.reassemble_file(&manifest, &dest).await
                     {
-                        info!("Bonded Download complete! Reassembling to {}", dest);
-                        if let Some(manifest) =
-                            state.manifests.read().await.get(&manifest_id).cloned()
-                        {
-                            if let Err(e) = state.storage.reassemble_file(&manifest, &dest).await {
-                                tracing::error!("Failed to reassemble file: {}", e);
-                            }
-                        }
+                        tracing::error!("Failed to reassemble file: {}", e);
                     }
                 }
 

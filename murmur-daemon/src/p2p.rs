@@ -225,27 +225,24 @@ pub async fn handle_net_message(
                                 .unwrap_or(false)
                         };
 
-                        if is_complete {
-                            if let Some(dest) = state
+                        if is_complete
+                            && let Some(dest) = state
                                 .download_destinations
                                 .read()
                                 .await
                                 .get(&manifest_id)
                                 .cloned()
-                            {
-                                info!("Download complete! Reassembling to {}", dest);
-                                let manifest = state
-                                    .manifests
-                                    .read()
-                                    .await
-                                    .get(&manifest_id)
-                                    .cloned()
-                                    .unwrap();
-                                if let Err(e) =
-                                    state.storage.reassemble_file(&manifest, &dest).await
-                                {
-                                    tracing::error!("Failed to reassemble file: {}", e);
-                                }
+                        {
+                            info!("Download complete! Reassembling to {}", dest);
+                            let manifest = state
+                                .manifests
+                                .read()
+                                .await
+                                .get(&manifest_id)
+                                .cloned()
+                                .unwrap();
+                            if let Err(e) = state.storage.reassemble_file(&manifest, &dest).await {
+                                tracing::error!("Failed to reassemble file: {}", e);
                             }
                         }
                     } else {

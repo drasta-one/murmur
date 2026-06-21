@@ -209,27 +209,27 @@ impl BullyElection {
         now: SimTime,
         all_active_nodes: &[NodeId],
     ) -> Option<Vec<ElectionMessage>> {
-        if let ElectionState::WaitingForResponses { started_at, .. } = &self.state {
-            if now.duration_since(*started_at) >= self.election_timeout_ms {
-                // No response — we win!
-                self.current_term += 1;
-                self.state = ElectionState::Won {
+        if let ElectionState::WaitingForResponses { started_at, .. } = &self.state
+            && now.duration_since(*started_at) >= self.election_timeout_ms
+        {
+            // No response — we win!
+            self.current_term += 1;
+            self.state = ElectionState::Won {
+                term: self.current_term,
+                at: now,
+            };
+            self.known_coordinator = Some(self.node_id);
+
+            let victory_msgs: Vec<ElectionMessage> = all_active_nodes
+                .iter()
+                .filter(|&&id| id != self.node_id)
+                .map(|_| ElectionMessage::Victory {
+                    from: self.node_id,
                     term: self.current_term,
-                    at: now,
-                };
-                self.known_coordinator = Some(self.node_id);
+                })
+                .collect();
 
-                let victory_msgs: Vec<ElectionMessage> = all_active_nodes
-                    .iter()
-                    .filter(|&&id| id != self.node_id)
-                    .map(|_| ElectionMessage::Victory {
-                        from: self.node_id,
-                        term: self.current_term,
-                    })
-                    .collect();
-
-                return Some(victory_msgs);
-            }
+            return Some(victory_msgs);
         }
         None
     }

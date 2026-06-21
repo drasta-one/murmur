@@ -107,12 +107,10 @@ impl CoordinatorLifecycle {
             since: _,
             ..
         } = &self.state
+            && let Some(record) = self.history.last_mut()
+            && record.node_id == *coordinator
         {
-            if let Some(record) = self.history.last_mut() {
-                if record.node_id == *coordinator {
-                    record.duration_ms = Some(at.duration_since(record.elected_at));
-                }
-            }
+            record.duration_ms = Some(at.duration_since(record.elected_at));
         }
 
         self.state = CoordinatorState::Electing { started_at: at };
@@ -179,10 +177,10 @@ impl CoordinatorLifecycle {
             let _elected_at = *since;
 
             // Update the history record with duration
-            if let Some(record) = self.history.last_mut() {
-                if record.node_id == previous {
-                    record.duration_ms = Some(at.duration_since(record.elected_at));
-                }
+            if let Some(record) = self.history.last_mut()
+                && record.node_id == previous
+            {
+                record.duration_ms = Some(at.duration_since(record.elected_at));
             }
 
             self.state = CoordinatorState::Dead {

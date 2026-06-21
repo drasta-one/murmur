@@ -90,17 +90,17 @@ impl ControlPlane for ControlPlaneService {
                 .unwrap_or(false)
         };
 
-        if is_complete {
-            if let Some(manifest) = self.state.manifests.read().await.get(&manifest_id).cloned() {
-                info!("Download already complete! Reassembling to {}", req.url);
-                if let Err(e) = self
-                    .state
-                    .storage
-                    .reassemble_file(&manifest, &req.url)
-                    .await
-                {
-                    tracing::error!("Failed to reassemble file: {}", e);
-                }
+        if is_complete
+            && let Some(manifest) = self.state.manifests.read().await.get(&manifest_id).cloned()
+        {
+            info!("Download already complete! Reassembling to {}", req.url);
+            if let Err(e) = self
+                .state
+                .storage
+                .reassemble_file(&manifest, &req.url)
+                .await
+            {
+                tracing::error!("Failed to reassemble file: {}", e);
             }
         }
 
@@ -476,10 +476,10 @@ impl ControlPlane for ControlPlaneService {
                     manifest: download.manifest.clone(),
                 };
                 for node_id in per_node.keys() {
-                    if *node_id != self.state.node_id {
-                        if let Some(conn) = self.state.connections.read().await.get(node_id) {
-                            let _ = conn.send_message(&manifest_msg).await;
-                        }
+                    if *node_id != self.state.node_id
+                        && let Some(conn) = self.state.connections.read().await.get(node_id)
+                    {
+                        let _ = conn.send_message(&manifest_msg).await;
                     }
                 }
 

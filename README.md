@@ -72,42 +72,41 @@ Murmur is organized as a Cargo workspace of focused crates:
 
 ## Quick Start
 
-Add the crates you need to your `Cargo.toml`:
+### Pre-built Binaries
 
-```toml
-[dependencies]
-murmur-core = "0.1"
-murmur-daemon = "0.1"
-```
+Download the latest release for your platform from
+[GitHub Releases](https://github.com/drasta-one/murmur/releases).
 
-Minimal node startup:
-
-```rust
-use murmur_daemon::Node;
-
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    let node = Node::builder()
-        .storage_dir("/tmp/murmur")
-        .discover(true)
-        .build()
-        .await?;
-
-    node.run().await
-}
-```
-
-Or use the CLI directly:
+Extract and run:
 
 ```sh
-# Start a node
-murmur daemon --storage /tmp/murmur
+tar xzf murmur-v0.1.0-x86_64-unknown-linux-gnu.tar.gz
+cd murmur-v0.1.0-x86_64-unknown-linux-gnu
 
-# Send a file to the swarm
-murmur send ./dataset.tar.zst
+# Start the daemon
+./murmur-daemon --rpc-port 9090
+```
 
-# Receive the latest manifest
-murmur recv <manifest-id> -o ./out
+### Using the CLI
+
+```sh
+# Check node status
+murmur-cli status
+
+# Seed a file into the swarm
+murmur-cli seed ./dataset.tar.zst
+
+# List known manifests
+murmur-cli list
+
+# Download a file by manifest ID
+murmur-cli get <manifest-id> ./output-file
+
+# Bonded download — aggregate bandwidth from all peers
+murmur-cli bonded-fetch https://example.com/large-file.bin ./output.bin
+
+# Stop the daemon
+murmur-cli stop
 ```
 
 ## Building Platform Bindings
@@ -144,12 +143,12 @@ cargo build -p murmur-api --target aarch64-linux-android --release
 ## Building from Source
 
 ```sh
-git clone https://github.com/AryMishra/murmur.git
+git clone https://github.com/drasta-one/murmur.git
 cd murmur
 cargo build --release
 ```
 
-Requires Rust 1.88+ and a protobuf compiler (`protoc`).
+Requires Rust (latest stable) and a protobuf compiler (`protoc`).
 
 ## Contributing
 

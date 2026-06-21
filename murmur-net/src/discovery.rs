@@ -62,18 +62,18 @@ impl Discovery {
                 match event {
                     ServiceEvent::ServiceResolved(info) => {
                         let props = info.get_properties();
-                        if let Some(val) = props.get_property_val_str("node_id") {
-                            if let Ok(id) = val.parse::<u64>() {
-                                let addrs = info.get_addresses();
-                                if let Some(ip) = addrs.iter().next() {
-                                    let peer = PeerInfo {
-                                        node_id: id,
-                                        ip: *ip,
-                                        port: info.get_port(),
-                                    };
-                                    peers.write().await.insert(id, peer.clone());
-                                    let _ = tx.send(PeerEvent::Discovered(peer)).await;
-                                }
+                        if let Some(val) = props.get_property_val_str("node_id")
+                            && let Ok(id) = val.parse::<u64>()
+                        {
+                            let addrs = info.get_addresses();
+                            if let Some(ip) = addrs.iter().next() {
+                                let peer = PeerInfo {
+                                    node_id: id,
+                                    ip: *ip,
+                                    port: info.get_port(),
+                                };
+                                peers.write().await.insert(id, peer.clone());
+                                let _ = tx.send(PeerEvent::Discovered(peer)).await;
                             }
                         }
                     }

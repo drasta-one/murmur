@@ -193,22 +193,21 @@ pub async fn run_daemon(cli: Cli) -> anyhow::Result<()> {
                                             .storage
                                             .get_available_chunks(manifest)
                                             .await;
-                                        if !available.is_empty() {
-                                            if let Some(c) = state_conn_rx
+                                        if !available.is_empty()
+                                            && let Some(c) = state_conn_rx
                                                 .connections
                                                 .read()
                                                 .await
                                                 .get(&peer_node_id)
-                                            {
-                                                let _ = c
-                                                    .send_message(
-                                                        &murmur_core::net::NetMessage::Bitfield {
-                                                            manifest_id: manifest.id,
-                                                            chunks: available,
-                                                        },
-                                                    )
-                                                    .await;
-                                            }
+                                        {
+                                            let _ = c
+                                                .send_message(
+                                                    &murmur_core::net::NetMessage::Bitfield {
+                                                        manifest_id: manifest.id,
+                                                        chunks: available,
+                                                    },
+                                                )
+                                                .await;
                                         }
                                     }
                                 }
@@ -251,24 +250,21 @@ pub async fn run_daemon(cli: Cli) -> anyhow::Result<()> {
                             // Immediately re-request reassigned chunks from ANY other active node
                             for (manifest_id, chunk_id) in reassigned {
                                 let active = state_conn_rx.overlay.read().await.active_nodes();
-                                if let Some(target) = active.into_iter().next() {
-                                    if let Some(c) =
+                                if let Some(target) = active.into_iter().next()
+                                    && let Some(c) =
                                         state_conn_rx.connections.read().await.get(&target)
-                                    {
-                                        let _ = c
-                                            .send_message(
-                                                &murmur_core::net::NetMessage::RequestChunk {
-                                                    manifest_id,
-                                                    chunk_id,
-                                                },
-                                            )
-                                            .await;
-                                        state_conn_rx.tracker.write().await.mark_chunk_in_flight(
+                                {
+                                    let _ = c
+                                        .send_message(&murmur_core::net::NetMessage::RequestChunk {
                                             manifest_id,
                                             chunk_id,
-                                            target,
-                                        );
-                                    }
+                                        })
+                                        .await;
+                                    state_conn_rx.tracker.write().await.mark_chunk_in_flight(
+                                        manifest_id,
+                                        chunk_id,
+                                        target,
+                                    );
                                 }
                             }
                         }
@@ -356,15 +352,21 @@ pub async fn run_daemon(cli: Cli) -> anyhow::Result<()> {
                                                 .storage
                                                 .get_available_chunks(manifest)
                                                 .await;
-                                            if !available.is_empty() {
-                                                if let Some(c) = state_peer_tx
+                                            if !available.is_empty()
+                                                && let Some(c) = state_peer_tx
                                                     .connections
                                                     .read()
                                                     .await
                                                     .get(&NodeId(peer.node_id))
-                                                {
-                                                    let _ = c.send_message(&murmur_core::net::NetMessage::Bitfield { manifest_id: manifest.id, chunks: available }).await;
-                                                }
+                                            {
+                                                let _ = c
+                                                    .send_message(
+                                                        &murmur_core::net::NetMessage::Bitfield {
+                                                            manifest_id: manifest.id,
+                                                            chunks: available,
+                                                        },
+                                                    )
+                                                    .await;
                                             }
                                         }
                                     }
@@ -408,24 +410,23 @@ pub async fn run_daemon(cli: Cli) -> anyhow::Result<()> {
                                                     active.into_iter().find(|&id| id != p_node_id);
                                             }
 
-                                            if let Some(target) = new_target {
-                                                if let Some(conn) = state_conn_rx
+                                            if let Some(target) = new_target
+                                                && let Some(conn) = state_conn_rx
                                                     .connections
                                                     .read()
                                                     .await
                                                     .get(&target)
-                                                {
-                                                    let _ = conn.send_message(&murmur_core::net::NetMessage::RequestChunk { manifest_id, chunk_id }).await;
-                                                    state_conn_rx
-                                                        .tracker
-                                                        .write()
-                                                        .await
-                                                        .mark_chunk_in_flight(
-                                                            manifest_id,
-                                                            chunk_id,
-                                                            target,
-                                                        );
-                                                }
+                                            {
+                                                let _ = conn.send_message(&murmur_core::net::NetMessage::RequestChunk { manifest_id, chunk_id }).await;
+                                                state_conn_rx
+                                                    .tracker
+                                                    .write()
+                                                    .await
+                                                    .mark_chunk_in_flight(
+                                                        manifest_id,
+                                                        chunk_id,
+                                                        target,
+                                                    );
                                             }
                                         }
                                     });
@@ -457,22 +458,21 @@ pub async fn run_daemon(cli: Cli) -> anyhow::Result<()> {
                                 new_target = active.into_iter().find(|&id| id != p_node_id);
                             }
 
-                            if let Some(target) = new_target {
-                                if let Some(conn) =
+                            if let Some(target) = new_target
+                                && let Some(conn) =
                                     state_peer_tx.connections.read().await.get(&target)
-                                {
-                                    let _ = conn
-                                        .send_message(&murmur_core::net::NetMessage::RequestChunk {
-                                            manifest_id,
-                                            chunk_id,
-                                        })
-                                        .await;
-                                    state_peer_tx.tracker.write().await.mark_chunk_in_flight(
+                            {
+                                let _ = conn
+                                    .send_message(&murmur_core::net::NetMessage::RequestChunk {
                                         manifest_id,
                                         chunk_id,
-                                        target,
-                                    );
-                                }
+                                    })
+                                    .await;
+                                state_peer_tx.tracker.write().await.mark_chunk_in_flight(
+                                    manifest_id,
+                                    chunk_id,
+                                    target,
+                                );
                             }
                         } // end for
                     } // end PeerEvent::Lost
@@ -540,19 +540,18 @@ pub async fn run_daemon(cli: Cli) -> anyhow::Result<()> {
                                     for manifest in manifests.values() {
                                         let available =
                                             state_conn.storage.get_available_chunks(manifest).await;
-                                        if !available.is_empty() {
-                                            if let Some(c) =
+                                        if !available.is_empty()
+                                            && let Some(c) =
                                                 state_conn.connections.read().await.get(&node_id)
-                                            {
-                                                let _ = c
-                                                    .send_message(
-                                                        &murmur_core::net::NetMessage::Bitfield {
-                                                            manifest_id: manifest.id,
-                                                            chunks: available,
-                                                        },
-                                                    )
-                                                    .await;
-                                            }
+                                        {
+                                            let _ = c
+                                                .send_message(
+                                                    &murmur_core::net::NetMessage::Bitfield {
+                                                        manifest_id: manifest.id,
+                                                        chunks: available,
+                                                    },
+                                                )
+                                                .await;
                                         }
                                     }
                                 }

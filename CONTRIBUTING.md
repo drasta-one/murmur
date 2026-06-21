@@ -7,7 +7,7 @@ need to get started.
 
 | Tool | Version | Notes |
 |---|---|---|
-| Rust | 1.85+ | Install via [rustup](https://rustup.rs/) |
+| Rust | stable (latest) | Install via [rustup](https://rustup.rs/) |
 | `protoc` | 3.x+ | Protobuf compiler, required by `murmur-proto` |
 | Git | any | |
 
