@@ -149,7 +149,7 @@ cd murmur
 cargo build --release
 ```
 
-Requires Rust 1.85+ and a protobuf compiler (`protoc`).
+Requires Rust 1.88+ and a protobuf compiler (`protoc`).
 
 ## Contributing
 
