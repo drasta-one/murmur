@@ -473,8 +473,6 @@ pub fn handle_request_more_work(
 #[cfg(test)]
 mod tests {
     use super::*;
-    
-    
 
     fn make_test_manifest(total_size: u64, chunk_size: u32) -> Manifest {
         let info = UrlResourceInfo {

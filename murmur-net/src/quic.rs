@@ -10,10 +10,7 @@ pub fn generate_self_signed_cert() -> Result<(CertificateDer<'static>, PrivateKe
     let cert = rcgen::generate_simple_self_signed(vec!["localhost".into()])?;
     let key = cert.key_pair.serialize_der();
     let cert_der = cert.cert.der().clone();
-    Ok((
-        cert_der.into_owned(),
-        PrivateKeyDer::try_from(key).unwrap(),
-    ))
+    Ok((cert_der.into_owned(), PrivateKeyDer::try_from(key).unwrap()))
 }
 
 /// A dummy verifier that accepts any certificate (TOFU/P2P model)
