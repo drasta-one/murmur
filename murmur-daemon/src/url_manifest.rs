@@ -55,7 +55,8 @@ pub async fn probe_url(url: &str) -> Result<UrlResourceInfo> {
         .await
         .context("HTTP HEAD request failed")?;
 
-    if response.status().is_redirection() || response.status() == reqwest::StatusCode::UNAUTHORIZED {
+    if response.status().is_redirection() || response.status() == reqwest::StatusCode::UNAUTHORIZED
+    {
         return Ok(UrlResourceInfo {
             tier: ServerTier::Tier4Redirect,
             total_size: 0,

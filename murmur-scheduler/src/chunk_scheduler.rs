@@ -66,10 +66,7 @@ impl ChunkScheduler {
     ) -> (Task, Task) {
         let send_task = Task::new(
             TaskId(self.next_task_id),
-            TaskKind::SendChunkToPeer {
-                chunk_id,
-                target,
-            },
+            TaskKind::SendChunkToPeer { chunk_id, target },
             source,
             at,
             self.max_retries,
@@ -78,10 +75,7 @@ impl ChunkScheduler {
 
         let recv_task = Task::new(
             TaskId(self.next_task_id),
-            TaskKind::ReceiveChunkFromPeer {
-                chunk_id,
-                source,
-            },
+            TaskKind::ReceiveChunkFromPeer { chunk_id, source },
             target,
             at,
             self.max_retries,
@@ -92,12 +86,7 @@ impl ChunkScheduler {
     }
 
     /// Create a verification task for a chunk on a specific node.
-    pub fn create_verify_task(
-        &mut self,
-        chunk_id: ChunkId,
-        node_id: NodeId,
-        at: SimTime,
-    ) -> Task {
+    pub fn create_verify_task(&mut self, chunk_id: ChunkId, node_id: NodeId, at: SimTime) -> Task {
         let task = Task::new(
             TaskId(self.next_task_id),
             TaskKind::VerifyChunk { chunk_id },
@@ -149,14 +138,25 @@ mod tests {
     fn redistribution_creates_send_recv_pair() {
         let mut scheduler = ChunkScheduler::new(2);
 
-        let (send, recv) = scheduler.create_redistribution_task(
-            ChunkId(5), NodeId(1), NodeId(2), SimTime(1000),
-        );
+        let (send, recv) =
+            scheduler.create_redistribution_task(ChunkId(5), NodeId(1), NodeId(2), SimTime(1000));
 
-        assert!(matches!(send.kind, TaskKind::SendChunkToPeer { chunk_id: ChunkId(5), target: NodeId(2) }));
+        assert!(matches!(
+            send.kind,
+            TaskKind::SendChunkToPeer {
+                chunk_id: ChunkId(5),
+                target: NodeId(2)
+            }
+        ));
         assert_eq!(send.assigned_to, NodeId(1));
 
-        assert!(matches!(recv.kind, TaskKind::ReceiveChunkFromPeer { chunk_id: ChunkId(5), source: NodeId(1) }));
+        assert!(matches!(
+            recv.kind,
+            TaskKind::ReceiveChunkFromPeer {
+                chunk_id: ChunkId(5),
+                source: NodeId(1)
+            }
+        ));
         assert_eq!(recv.assigned_to, NodeId(2));
     }
 
@@ -165,7 +165,12 @@ mod tests {
         let mut scheduler = ChunkScheduler::new(3);
         let task = scheduler.create_verify_task(ChunkId(0), NodeId(1), SimTime(500));
 
-        assert!(matches!(task.kind, TaskKind::VerifyChunk { chunk_id: ChunkId(0) }));
+        assert!(matches!(
+            task.kind,
+            TaskKind::VerifyChunk {
+                chunk_id: ChunkId(0)
+            }
+        ));
         assert_eq!(task.max_retries, 0); // no retries for verify
     }
 

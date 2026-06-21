@@ -1,8 +1,8 @@
 //! Shared type identifiers used across all DOR crates.
 
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 use std::fmt;
+use uuid::Uuid;
 
 /// Unique identifier for a node in the cluster.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -81,7 +81,9 @@ impl fmt::Display for ManifestId {
 /// Simulated time in milliseconds from simulation start.
 ///
 /// This is NOT wall-clock time. It is a virtual clock controlled by the simulation engine.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+)]
 pub struct SimTime(pub u64);
 
 impl SimTime {

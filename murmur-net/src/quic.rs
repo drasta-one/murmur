@@ -1,16 +1,19 @@
 use anyhow::Result;
+use quinn::crypto::rustls::{QuicClientConfig, QuicServerConfig};
 use quinn::{ClientConfig, Endpoint, ServerConfig};
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
-use std::sync::Arc;
 use std::net::SocketAddr;
-use quinn::crypto::rustls::{QuicClientConfig, QuicServerConfig};
+use std::sync::Arc;
 
 /// Generates a self-signed TOFU certificate for QUIC.
 pub fn generate_self_signed_cert() -> Result<(CertificateDer<'static>, PrivateKeyDer<'static>)> {
     let cert = rcgen::generate_simple_self_signed(vec!["localhost".into()])?;
     let key = cert.key_pair.serialize_der();
     let cert_der = cert.cert.der().clone();
-    Ok((CertificateDer::from(cert_der.into_owned()), PrivateKeyDer::try_from(key).unwrap()))
+    Ok((
+        CertificateDer::from(cert_der.into_owned()),
+        PrivateKeyDer::try_from(key).unwrap(),
+    ))
 }
 
 /// A dummy verifier that accepts any certificate (TOFU/P2P model)
@@ -28,7 +31,7 @@ impl rustls::client::danger::ServerCertVerifier for SkipServerVerification {
     ) -> Result<rustls::client::danger::ServerCertVerified, rustls::Error> {
         Ok(rustls::client::danger::ServerCertVerified::assertion())
     }
-    
+
     fn verify_tls12_signature(
         &self,
         _message: &[u8],
@@ -37,7 +40,7 @@ impl rustls::client::danger::ServerCertVerifier for SkipServerVerification {
     ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
         Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
     }
-    
+
     fn verify_tls13_signature(
         &self,
         _message: &[u8],
@@ -46,7 +49,7 @@ impl rustls::client::danger::ServerCertVerifier for SkipServerVerification {
     ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
         Ok(rustls::client::danger::HandshakeSignatureValid::assertion())
     }
-    
+
     fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
         vec![
             rustls::SignatureScheme::RSA_PKCS1_SHA256,
@@ -58,7 +61,9 @@ impl rustls::client::danger::ServerCertVerifier for SkipServerVerification {
 }
 
 pub fn make_quic_endpoint(bind_addr: SocketAddr) -> Result<Endpoint> {
-    rustls::crypto::ring::default_provider().install_default().ok();
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .ok();
     let (cert, key) = generate_self_signed_cert()?;
 
     // Server Config
@@ -66,7 +71,7 @@ pub fn make_quic_endpoint(bind_addr: SocketAddr) -> Result<Endpoint> {
         .with_no_client_auth()
         .with_single_cert(vec![cert.clone()], key)?;
     server_crypto.alpn_protocols = vec![b"murmur-quic".to_vec()];
-    
+
     let quic_server_config = QuicServerConfig::try_from(server_crypto)?;
     let server_config = ServerConfig::with_crypto(Arc::new(quic_server_config));
 
@@ -76,7 +81,7 @@ pub fn make_quic_endpoint(bind_addr: SocketAddr) -> Result<Endpoint> {
         .with_custom_certificate_verifier(Arc::new(SkipServerVerification))
         .with_no_client_auth();
     client_crypto.alpn_protocols = vec![b"murmur-quic".to_vec()];
-    
+
     let quic_client_config = QuicClientConfig::try_from(client_crypto)?;
     let client_config = ClientConfig::new(Arc::new(quic_client_config));
 
@@ -89,7 +94,7 @@ pub fn make_quic_endpoint(bind_addr: SocketAddr) -> Result<Endpoint> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::time::{sleep, Duration};
+    use tokio::time::{Duration, sleep};
 
     #[tokio::test]
     async fn test_quic_connection() -> Result<()> {
@@ -105,11 +110,11 @@ mod tests {
             let incoming = server_endpoint.accept().await.unwrap();
             let connection = incoming.await.unwrap();
             let (mut send, mut recv) = connection.accept_bi().await.unwrap();
-            
+
             let mut buf = [0u8; 10];
             recv.read_exact(&mut buf).await.unwrap();
             assert_eq!(&buf, b"helloworld");
-            
+
             send.write_all(b"helloworld").await.unwrap();
             send.finish().unwrap();
             sleep(Duration::from_millis(100)).await;
@@ -121,7 +126,7 @@ mod tests {
 
         send.write_all(b"helloworld").await?;
         send.finish()?;
-        
+
         let mut buf = [0u8; 10];
         recv.read_exact(&mut buf).await?;
         assert_eq!(&buf, b"helloworld");

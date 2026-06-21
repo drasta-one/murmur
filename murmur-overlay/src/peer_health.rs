@@ -28,9 +28,7 @@ impl PeerHealthTracker {
         let timeout_ms = heartbeat_interval_ms * u64::from(timeout_multiplier);
         debug!(
             timeout_ms,
-            heartbeat_interval_ms,
-            timeout_multiplier,
-            "PeerHealthTracker created"
+            heartbeat_interval_ms, timeout_multiplier, "PeerHealthTracker created"
         );
         Self {
             last_heartbeats: HashMap::new(),

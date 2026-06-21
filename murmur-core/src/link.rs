@@ -103,12 +103,7 @@ mod tests {
 
     #[test]
     fn healthy_link_transfer_time() {
-        let link = Link::new(
-            NodeId(1),
-            NodeId(2),
-            LinkMetrics::default(),
-            SimTime::ZERO,
-        );
+        let link = Link::new(NodeId(1), NodeId(2), LinkMetrics::default(), SimTime::ZERO);
         // 50 MB/s, 2ms latency, 1MB transfer
         // 1_048_576 * 1000 / 50_000_000 = 20ms + 2ms = 22ms
         let time = link.transfer_time_ms(1_048_576);
@@ -117,12 +112,7 @@ mod tests {
 
     #[test]
     fn severed_link_returns_none() {
-        let mut link = Link::new(
-            NodeId(1),
-            NodeId(2),
-            LinkMetrics::default(),
-            SimTime::ZERO,
-        );
+        let mut link = Link::new(NodeId(1), NodeId(2), LinkMetrics::default(), SimTime::ZERO);
         link.sever(SimTime(100));
         assert_eq!(link.transfer_time_ms(1_048_576), None);
     }

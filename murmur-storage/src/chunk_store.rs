@@ -1,9 +1,9 @@
+use murmur_core::manifest::Manifest;
+use murmur_core::types::{ChunkId, ManifestId};
 use std::path::{Path, PathBuf};
 use tokio::fs::{self, File};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tracing::info;
-use murmur_core::types::{ChunkId, ManifestId};
-use murmur_core::manifest::Manifest;
 
 pub struct ChunkStore {
     storage_dir: PathBuf,
@@ -17,14 +17,22 @@ impl ChunkStore {
     }
 
     fn file_path(&self, manifest_id: ManifestId) -> PathBuf {
-        self.storage_dir.join(manifest_id.0.to_string()).join("file.bin")
+        self.storage_dir
+            .join(manifest_id.0.to_string())
+            .join("file.bin")
     }
 
     fn marker_path(&self, manifest_id: ManifestId, id: ChunkId) -> PathBuf {
-        self.storage_dir.join(manifest_id.0.to_string()).join(format!("chunk_{}.marker", id.0))
+        self.storage_dir
+            .join(manifest_id.0.to_string())
+            .join(format!("chunk_{}.marker", id.0))
     }
 
-    pub async fn preallocate(&self, manifest_id: ManifestId, total_size: u64) -> anyhow::Result<()> {
+    pub async fn preallocate(
+        &self,
+        manifest_id: ManifestId,
+        total_size: u64,
+    ) -> anyhow::Result<()> {
         let path = self.file_path(manifest_id);
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).await?;
@@ -34,7 +42,13 @@ impl ChunkStore {
         Ok(())
     }
 
-    pub async fn write_chunk(&self, manifest_id: ManifestId, id: ChunkId, data: &[u8], offset: u64) -> anyhow::Result<()> {
+    pub async fn write_chunk(
+        &self,
+        manifest_id: ManifestId,
+        id: ChunkId,
+        data: &[u8],
+        offset: u64,
+    ) -> anyhow::Result<()> {
         let path = self.file_path(manifest_id);
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).await?;
@@ -42,7 +56,7 @@ impl ChunkStore {
 
         let data = data.to_vec();
         let path_clone = path.clone();
-        
+
         tokio::task::spawn_blocking(move || {
             use std::os::unix::fs::FileExt;
             let file = std::fs::OpenOptions::new()
@@ -51,7 +65,8 @@ impl ChunkStore {
                 .open(&path_clone)?;
             file.write_at(&data, offset)?;
             Ok::<(), anyhow::Error>(())
-        }).await??;
+        })
+        .await??;
 
         // Write marker
         let marker = self.marker_path(manifest_id, id);
@@ -60,21 +75,28 @@ impl ChunkStore {
         Ok(())
     }
 
-    pub async fn read_chunk(&self, manifest_id: ManifestId, id: ChunkId, offset: u64, size: u32) -> anyhow::Result<Option<Vec<u8>>> {
+    pub async fn read_chunk(
+        &self,
+        manifest_id: ManifestId,
+        id: ChunkId,
+        offset: u64,
+        size: u32,
+    ) -> anyhow::Result<Option<Vec<u8>>> {
         if !self.has_chunk(manifest_id, id).await {
             return Ok(None);
         }
 
         let path = self.file_path(manifest_id);
         let path_clone = path.clone();
-        
+
         let data = tokio::task::spawn_blocking(move || {
             use std::os::unix::fs::FileExt;
             let file = std::fs::File::open(&path_clone)?;
             let mut buf = vec![0u8; size as usize];
             file.read_exact_at(&mut buf, offset)?;
             Ok::<Vec<u8>, anyhow::Error>(buf)
-        }).await??;
+        })
+        .await??;
 
         Ok(Some(data))
     }
@@ -93,10 +115,17 @@ impl ChunkStore {
         available
     }
 
-    pub async fn reassemble_file(&self, manifest: &Manifest, out_path: impl AsRef<Path>) -> anyhow::Result<()> {
+    pub async fn reassemble_file(
+        &self,
+        manifest: &Manifest,
+        out_path: impl AsRef<Path>,
+    ) -> anyhow::Result<()> {
         if manifest.total_size == 0 {
             File::create(out_path).await?;
-            info!("Zero-byte file successfully created for manifest {}", manifest.id.0);
+            info!(
+                "Zero-byte file successfully created for manifest {}",
+                manifest.id.0
+            );
             return Ok(());
         }
 
@@ -105,7 +134,10 @@ impl ChunkStore {
             anyhow::bail!("Data file missing for manifest {}", manifest.id.0);
         }
         fs::copy(&path, out_path).await?;
-        info!("File successfully reassembled for manifest {}", manifest.id.0);
+        info!(
+            "File successfully reassembled for manifest {}",
+            manifest.id.0
+        );
         Ok(())
     }
 }
@@ -127,15 +159,24 @@ mod tests {
 
         // Should not exist initially
         assert!(!store.has_chunk(manifest_id, chunk_id).await);
-        let read_none = store.read_chunk(manifest_id, chunk_id, 0, data.len() as u32).await.unwrap();
+        let read_none = store
+            .read_chunk(manifest_id, chunk_id, 0, data.len() as u32)
+            .await
+            .unwrap();
         assert!(read_none.is_none());
 
         // Write
-        store.write_chunk(manifest_id, chunk_id, data, 0).await.unwrap();
+        store
+            .write_chunk(manifest_id, chunk_id, data, 0)
+            .await
+            .unwrap();
 
         // Should exist now
         assert!(store.has_chunk(manifest_id, chunk_id).await);
-        let read_data = store.read_chunk(manifest_id, chunk_id, 0, data.len() as u32).await.unwrap();
+        let read_data = store
+            .read_chunk(manifest_id, chunk_id, 0, data.len() as u32)
+            .await
+            .unwrap();
         assert_eq!(read_data.unwrap(), data);
     }
 
@@ -149,15 +190,40 @@ mod tests {
         let d2 = b"part 2 ";
         let d3 = b"part 3";
         let manifest_id = ManifestId::new();
-        
-        store.preallocate(manifest_id, (d1.len() + d2.len() + d3.len()) as u64).await.unwrap();
-        
-        store.write_chunk(manifest_id, ChunkId(0), d1, 0).await.unwrap();
-        store.write_chunk(manifest_id, ChunkId(1), d2, d1.len() as u64).await.unwrap();
-        store.write_chunk(manifest_id, ChunkId(2), d3, (d1.len() + d2.len()) as u64).await.unwrap();
 
-        let manifest_bytes = d1.iter().chain(d2.iter()).chain(d3.iter()).copied().collect::<Vec<_>>();
-        let mut manifest = Manifest::from_data("test.txt", &manifest_bytes, 7, murmur_core::manifest::ManifestSource::LocalFile { path: temp_dir.path().join("test.txt") }, SimTime::ZERO);
+        store
+            .preallocate(manifest_id, (d1.len() + d2.len() + d3.len()) as u64)
+            .await
+            .unwrap();
+
+        store
+            .write_chunk(manifest_id, ChunkId(0), d1, 0)
+            .await
+            .unwrap();
+        store
+            .write_chunk(manifest_id, ChunkId(1), d2, d1.len() as u64)
+            .await
+            .unwrap();
+        store
+            .write_chunk(manifest_id, ChunkId(2), d3, (d1.len() + d2.len()) as u64)
+            .await
+            .unwrap();
+
+        let manifest_bytes = d1
+            .iter()
+            .chain(d2.iter())
+            .chain(d3.iter())
+            .copied()
+            .collect::<Vec<_>>();
+        let mut manifest = Manifest::from_data(
+            "test.txt",
+            &manifest_bytes,
+            7,
+            murmur_core::manifest::ManifestSource::LocalFile {
+                path: temp_dir.path().join("test.txt"),
+            },
+            SimTime::ZERO,
+        );
         manifest.id = manifest_id;
 
         let out_path = temp_dir.path().join("out.txt");

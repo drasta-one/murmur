@@ -30,8 +30,8 @@ pub struct NodeConfig {
 impl Default for NodeConfig {
     fn default() -> Self {
         Self {
-            wan_bandwidth: 5_000_000,     // 5 MB/s
-            lan_bandwidth: 50_000_000,    // 50 MB/s
+            wan_bandwidth: 5_000_000,  // 5 MB/s
+            lan_bandwidth: 50_000_000, // 50 MB/s
             wan_latency_ms: 50,
             lan_latency_ms: 2,
             failure_probability: 0.0,

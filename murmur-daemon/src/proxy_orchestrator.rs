@@ -1,12 +1,12 @@
-use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::net::TcpStream;
-use tokio::sync::{mpsc, oneshot, RwLock};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tracing::{debug, error, info, warn};
 use murmur_core::net::NetMessage;
 use murmur_core::types::NodeId;
 use rand::Rng;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
+use tokio::sync::{RwLock, mpsc, oneshot};
+use tracing::{debug, error, info, warn};
 
 pub struct ProxyOrchestrator {
     node_id: NodeId,
@@ -39,7 +39,7 @@ impl ProxyOrchestrator {
     async fn select_node(&self) -> Option<(NodeId, u64)> {
         let overlay = self.overlay.read().await;
         let mut active_nodes = Vec::new();
-        
+
         let local_config = murmur_core::node::NodeConfig {
             wan_bandwidth: self.wan_bandwidth,
             ..Default::default()
@@ -56,7 +56,10 @@ impl ProxyOrchestrator {
             return None;
         }
 
-        let total_bw: u64 = active_nodes.iter().map(|(_, cfg)| cfg.wan_bandwidth.max(1)).sum();
+        let total_bw: u64 = active_nodes
+            .iter()
+            .map(|(_, cfg)| cfg.wan_bandwidth.max(1))
+            .sum();
         let mut rng = rand::thread_rng();
         let mut point = rng.gen_range(0..total_bw);
 
@@ -67,13 +70,24 @@ impl ProxyOrchestrator {
             }
             point -= bw;
         }
-        
+
         None
     }
 
-    pub async fn handle_new_connection(self: Arc<Self>, mut client_stream: TcpStream, host: String, port: u16) -> anyhow::Result<()> {
+    pub async fn handle_new_connection(
+        self: Arc<Self>,
+        mut client_stream: TcpStream,
+        host: String,
+        port: u16,
+    ) -> anyhow::Result<()> {
         let (node_id, bw) = self.select_node().await.unwrap_or((self.node_id, 0));
-        info!("SOCKS5 routing {}:{} via Node {} (BW: {} Mbps)", host, port, node_id.0, bw / 125_000);
+        info!(
+            "SOCKS5 routing {}:{} via Node {} (BW: {} Mbps)",
+            host,
+            port,
+            node_id.0,
+            bw / 125_000
+        );
 
         if node_id == self.node_id {
             // Local direct connection
@@ -81,9 +95,14 @@ impl ProxyOrchestrator {
             match TcpStream::connect(&target_addr).await {
                 Ok(mut remote_stream) => {
                     // SOCKS5 success reply
-                    client_stream.write_all(&[0x05, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0]).await?;
+                    client_stream
+                        .write_all(&[0x05, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0])
+                        .await?;
                     tokio::spawn(async move {
-                        if let Err(e) = tokio::io::copy_bidirectional(&mut client_stream, &mut remote_stream).await {
+                        if let Err(e) =
+                            tokio::io::copy_bidirectional(&mut client_stream, &mut remote_stream)
+                                .await
+                        {
                             debug!("Direct proxy stream ended: {}", e);
                         }
                     });
@@ -91,21 +110,33 @@ impl ProxyOrchestrator {
                 Err(e) => {
                     error!("Failed to connect directly to {}: {}", target_addr, e);
                     // SOCKS5 host unreachable
-                    client_stream.write_all(&[0x05, 0x04, 0x00, 0x01, 0, 0, 0, 0, 0, 0]).await?;
+                    client_stream
+                        .write_all(&[0x05, 0x04, 0x00, 0x01, 0, 0, 0, 0, 0, 0])
+                        .await?;
                 }
             }
         } else {
             // Remote connection via P2P
             let stream_id = rand::random::<u32>();
-            
+
             let (tx, mut rx) = mpsc::channel::<Vec<u8>>(1024);
-            self.active_streams.write().await.insert(stream_id, (tx, node_id));
+            self.active_streams
+                .write()
+                .await
+                .insert(stream_id, (tx, node_id));
 
             let (connect_tx, connect_rx) = oneshot::channel();
-            self.connect_waiters.write().await.insert(stream_id, connect_tx);
+            self.connect_waiters
+                .write()
+                .await
+                .insert(stream_id, connect_tx);
 
             // Send ProxyConnect
-            let msg = NetMessage::ProxyConnect { stream_id, host, port };
+            let msg = NetMessage::ProxyConnect {
+                stream_id,
+                host,
+                port,
+            };
             if let Some(conn) = self.connections.read().await.get(&node_id) {
                 conn.send_message(&msg).await?;
             } else {
@@ -113,24 +144,29 @@ impl ProxyOrchestrator {
             }
 
             // Wait for ProxyConnectResult
-            let success = match tokio::time::timeout(std::time::Duration::from_secs(10), connect_rx).await {
-                Ok(Ok(res)) => res,
-                _ => {
-                    self.active_streams.write().await.remove(&stream_id);
-                    self.connect_waiters.write().await.remove(&stream_id);
-                    anyhow::bail!("Timeout waiting for ProxyConnectResult");
-                }
-            };
+            let success =
+                match tokio::time::timeout(std::time::Duration::from_secs(10), connect_rx).await {
+                    Ok(Ok(res)) => res,
+                    _ => {
+                        self.active_streams.write().await.remove(&stream_id);
+                        self.connect_waiters.write().await.remove(&stream_id);
+                        anyhow::bail!("Timeout waiting for ProxyConnectResult");
+                    }
+                };
 
             if !success {
                 // SOCKS5 host unreachable
-                client_stream.write_all(&[0x05, 0x04, 0x00, 0x01, 0, 0, 0, 0, 0, 0]).await?;
+                client_stream
+                    .write_all(&[0x05, 0x04, 0x00, 0x01, 0, 0, 0, 0, 0, 0])
+                    .await?;
                 self.active_streams.write().await.remove(&stream_id);
                 return Ok(());
             }
 
             // SOCKS5 success reply
-            client_stream.write_all(&[0x05, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0]).await?;
+            client_stream
+                .write_all(&[0x05, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0])
+                .await?;
 
             let connections_clone = self.connections.clone();
             let orch_clone1 = self.clone();
@@ -146,7 +182,11 @@ impl ProxyOrchestrator {
                         break;
                     }
                 }
-                orch_clone1.active_streams.write().await.remove(&stream_id_c);
+                orch_clone1
+                    .active_streams
+                    .write()
+                    .await
+                    .remove(&stream_id_c);
             });
 
             // Task 2: Read from SOCKS client -> Send P2P ProxyData
@@ -156,7 +196,10 @@ impl ProxyOrchestrator {
                     match rh.read(&mut buf).await {
                         Ok(0) => break, // EOF
                         Ok(n) => {
-                            let msg = NetMessage::ProxyData { stream_id: stream_id_c, data: buf[..n].to_vec() };
+                            let msg = NetMessage::ProxyData {
+                                stream_id: stream_id_c,
+                                data: buf[..n].to_vec(),
+                            };
                             if let Some(conn) = connections_clone.read().await.get(&node_id) {
                                 let _ = conn.send_message(&msg).await;
                             } else {
@@ -168,9 +211,17 @@ impl ProxyOrchestrator {
                 }
                 // Send close
                 if let Some(conn) = connections_clone.read().await.get(&node_id) {
-                    let _ = conn.send_message(&NetMessage::ProxyClose { stream_id: stream_id_c }).await;
+                    let _ = conn
+                        .send_message(&NetMessage::ProxyClose {
+                            stream_id: stream_id_c,
+                        })
+                        .await;
                 }
-                orch_clone2.active_streams.write().await.remove(&stream_id_c);
+                orch_clone2
+                    .active_streams
+                    .write()
+                    .await
+                    .remove(&stream_id_c);
             });
         }
 
@@ -179,7 +230,11 @@ impl ProxyOrchestrator {
 
     pub async fn handle_p2p_message(self: Arc<Self>, node_id: NodeId, msg: NetMessage) {
         match msg {
-            NetMessage::ProxyConnect { stream_id, host, port } => {
+            NetMessage::ProxyConnect {
+                stream_id,
+                host,
+                port,
+            } => {
                 let orch = self.clone();
                 let connections_c = self.connections.clone();
                 tokio::spawn(async move {
@@ -187,12 +242,20 @@ impl ProxyOrchestrator {
                     match TcpStream::connect(&target).await {
                         Ok(stream) => {
                             if let Some(conn) = connections_c.read().await.get(&node_id) {
-                                let _ = conn.send_message(&NetMessage::ProxyConnectResult { stream_id, success: true }).await;
+                                let _ = conn
+                                    .send_message(&NetMessage::ProxyConnectResult {
+                                        stream_id,
+                                        success: true,
+                                    })
+                                    .await;
                             }
 
                             // We need to route incoming ProxyData for this stream_id back to this TCP stream
                             let (tx, mut rx) = mpsc::channel::<Vec<u8>>(1024);
-                            orch.active_streams.write().await.insert(stream_id, (tx, node_id));
+                            orch.active_streams
+                                .write()
+                                .await
+                                .insert(stream_id, (tx, node_id));
 
                             let (mut rh, mut wh) = stream.into_split();
 
@@ -205,8 +268,15 @@ impl ProxyOrchestrator {
                                     match rh.read(&mut buf).await {
                                         Ok(0) => break,
                                         Ok(n) => {
-                                            if let Some(conn) = connections_c2.read().await.get(&node_id) {
-                                                let _ = conn.send_message(&NetMessage::ProxyData { stream_id, data: buf[..n].to_vec() }).await;
+                                            if let Some(conn) =
+                                                connections_c2.read().await.get(&node_id)
+                                            {
+                                                let _ = conn
+                                                    .send_message(&NetMessage::ProxyData {
+                                                        stream_id,
+                                                        data: buf[..n].to_vec(),
+                                                    })
+                                                    .await;
                                             } else {
                                                 break;
                                             }
@@ -215,7 +285,9 @@ impl ProxyOrchestrator {
                                     }
                                 }
                                 if let Some(conn) = connections_c2.read().await.get(&node_id) {
-                                    let _ = conn.send_message(&NetMessage::ProxyClose { stream_id }).await;
+                                    let _ = conn
+                                        .send_message(&NetMessage::ProxyClose { stream_id })
+                                        .await;
                                 }
                                 orch_c1.active_streams.write().await.remove(&stream_id);
                             });
@@ -234,7 +306,12 @@ impl ProxyOrchestrator {
                         Err(e) => {
                             debug!("ProxyConnect failed to {}: {}", target, e);
                             if let Some(conn) = connections_c.read().await.get(&node_id) {
-                                let _ = conn.send_message(&NetMessage::ProxyConnectResult { stream_id, success: false }).await;
+                                let _ = conn
+                                    .send_message(&NetMessage::ProxyConnectResult {
+                                        stream_id,
+                                        success: false,
+                                    })
+                                    .await;
                             }
                         }
                     }

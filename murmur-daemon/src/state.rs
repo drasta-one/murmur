@@ -1,16 +1,16 @@
+use crate::bonded_download::BondedDownload;
+use crate::proxy_orchestrator::ProxyOrchestrator;
+use crate::transfer::TransferTracker;
 use murmur_coordinator::CoordinatorLifecycle;
+use murmur_core::types::{ManifestId, NodeId};
+use murmur_net::PeerConnection;
 use murmur_overlay::OverlayStateTable;
 use murmur_scheduler::ChunkScheduler;
 use murmur_storage::ChunkStore;
-use std::sync::Arc;
-use tokio::sync::{RwLock, Mutex};
-use std::path::PathBuf;
 use std::collections::{HashMap, HashSet};
-use crate::transfer::TransferTracker;
-use crate::bonded_download::BondedDownload;
-use murmur_core::types::{NodeId, ManifestId};
-use murmur_net::PeerConnection;
-use crate::proxy_orchestrator::ProxyOrchestrator;
+use std::path::PathBuf;
+use std::sync::Arc;
+use tokio::sync::{Mutex, RwLock};
 
 pub struct NodeState {
     pub node_id: NodeId,
@@ -32,7 +32,13 @@ pub struct NodeState {
 }
 
 impl NodeState {
-    pub async fn new(node_id: NodeId, storage_dir: PathBuf, malicious: bool, slow_loris: bool, wan_bandwidth: u64) -> anyhow::Result<Self> {
+    pub async fn new(
+        node_id: NodeId,
+        storage_dir: PathBuf,
+        malicious: bool,
+        slow_loris: bool,
+        wan_bandwidth: u64,
+    ) -> anyhow::Result<Self> {
         let config = murmur_core::cluster::ClusterConfig::default();
         let overlay = OverlayStateTable::new(config);
         let coordinator = CoordinatorLifecycle::new();
@@ -41,12 +47,12 @@ impl NodeState {
 
         let overlay = Arc::new(RwLock::new(overlay));
         let connections = Arc::new(RwLock::new(HashMap::new()));
-        
+
         let proxy_orchestrator = Arc::new(ProxyOrchestrator::new(
             node_id,
             wan_bandwidth,
             overlay.clone(),
-            connections.clone()
+            connections.clone(),
         ));
 
         Ok(Self {
@@ -77,10 +83,18 @@ mod tests {
     #[tokio::test]
     async fn test_node_state_initialization() {
         let temp_dir = tempfile::tempdir().unwrap();
-        let state = NodeState::new(NodeId(10), temp_dir.path().to_path_buf(), false, false, 50_000_000).await.unwrap();
+        let state = NodeState::new(
+            NodeId(10),
+            temp_dir.path().to_path_buf(),
+            false,
+            false,
+            50_000_000,
+        )
+        .await
+        .unwrap();
 
         assert_eq!(state.node_id.0, 10);
-        
+
         // Check initial overlay state
         let overlay = state.overlay.read().await;
         assert_eq!(overlay.active_nodes().len(), 0);
@@ -91,8 +105,16 @@ mod tests {
     #[tokio::test]
     async fn test_manifest_store_add_retrieve() {
         let temp_dir = tempfile::tempdir().unwrap();
-        let state = NodeState::new(NodeId(1), temp_dir.path().to_path_buf(), false, false, 50_000_000).await.unwrap();
-        
+        let state = NodeState::new(
+            NodeId(1),
+            temp_dir.path().to_path_buf(),
+            false,
+            false,
+            50_000_000,
+        )
+        .await
+        .unwrap();
+
         let manifest = murmur_core::manifest::Manifest {
             id: murmur_core::types::ManifestId::new(),
             name: "test.txt".into(),
@@ -100,12 +122,18 @@ mod tests {
             chunks: vec![],
             file_hash: [0; 32],
             chunk_size: 1024,
-            source: murmur_core::manifest::ManifestSource::LocalFile { path: std::path::PathBuf::from("test.txt") },
+            source: murmur_core::manifest::ManifestSource::LocalFile {
+                path: std::path::PathBuf::from("test.txt"),
+            },
             created_at: murmur_core::types::SimTime::ZERO,
         };
-        
-        state.manifests.write().await.insert(manifest.id, manifest.clone());
-        
+
+        state
+            .manifests
+            .write()
+            .await
+            .insert(manifest.id, manifest.clone());
+
         let retrieved = state.manifests.read().await.get(&manifest.id).cloned();
         assert_eq!(retrieved.unwrap().name, "test.txt");
     }

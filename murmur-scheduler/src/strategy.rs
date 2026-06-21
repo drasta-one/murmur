@@ -41,11 +41,7 @@ impl RoundRobinStrategy {
 }
 
 impl SchedulingStrategy for RoundRobinStrategy {
-    fn assign(
-        &self,
-        chunks: &[ChunkId],
-        nodes: &[(NodeId, u64)],
-    ) -> Vec<ChunkAssignment> {
+    fn assign(&self, chunks: &[ChunkId], nodes: &[(NodeId, u64)]) -> Vec<ChunkAssignment> {
         if nodes.is_empty() {
             return Vec::new();
         }
@@ -76,11 +72,7 @@ impl BandwidthWeightedStrategy {
 }
 
 impl SchedulingStrategy for BandwidthWeightedStrategy {
-    fn assign(
-        &self,
-        chunks: &[ChunkId],
-        nodes: &[(NodeId, u64)],
-    ) -> Vec<ChunkAssignment> {
+    fn assign(&self, chunks: &[ChunkId], nodes: &[(NodeId, u64)]) -> Vec<ChunkAssignment> {
         if nodes.is_empty() || chunks.is_empty() {
             return Vec::new();
         }
@@ -96,8 +88,7 @@ impl SchedulingStrategy for BandwidthWeightedStrategy {
         let mut node_quotas: Vec<(NodeId, usize)> = nodes
             .iter()
             .map(|(id, bw)| {
-                let share = (*bw as f64 / total_bandwidth as f64)
-                    * chunks.len() as f64;
+                let share = (*bw as f64 / total_bandwidth as f64) * chunks.len() as f64;
                 (*id, share.floor() as usize)
             })
             .collect();
@@ -192,9 +183,18 @@ mod tests {
         assert_eq!(assignments.len(), 20);
 
         // Count per node
-        let n1 = assignments.iter().filter(|a| a.node_id == NodeId(1)).count();
-        let n2 = assignments.iter().filter(|a| a.node_id == NodeId(2)).count();
-        let n3 = assignments.iter().filter(|a| a.node_id == NodeId(3)).count();
+        let n1 = assignments
+            .iter()
+            .filter(|a| a.node_id == NodeId(1))
+            .count();
+        let n2 = assignments
+            .iter()
+            .filter(|a| a.node_id == NodeId(2))
+            .count();
+        let n3 = assignments
+            .iter()
+            .filter(|a| a.node_id == NodeId(3))
+            .count();
 
         // Node 1 should get ~50% (10), nodes 2&3 ~25% each (5)
         assert_eq!(n1, 10);
@@ -205,10 +205,7 @@ mod tests {
     #[test]
     fn bandwidth_weighted_handles_remainder() {
         let strategy = BandwidthWeightedStrategy;
-        let nodes = vec![
-            node(1, 10_000_000),
-            node(2, 5_000_000),
-        ];
+        let nodes = vec![node(1, 10_000_000), node(2, 5_000_000)];
         // 7 chunks: 10/(10+5) * 7 = 4.66 → floor(4), 5/(10+5) * 7 = 2.33 → floor(2)
         // assigned = 6, remainder = 1 → goes to node 1 (highest bw)
         let chunk_ids = chunks(7);
@@ -216,8 +213,14 @@ mod tests {
         let assignments = strategy.assign(&chunk_ids, &nodes);
         assert_eq!(assignments.len(), 7);
 
-        let n1 = assignments.iter().filter(|a| a.node_id == NodeId(1)).count();
-        let n2 = assignments.iter().filter(|a| a.node_id == NodeId(2)).count();
+        let n1 = assignments
+            .iter()
+            .filter(|a| a.node_id == NodeId(1))
+            .count();
+        let n2 = assignments
+            .iter()
+            .filter(|a| a.node_id == NodeId(2))
+            .count();
         assert_eq!(n1, 5); // 4 + 1 remainder
         assert_eq!(n2, 2);
     }

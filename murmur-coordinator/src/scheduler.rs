@@ -49,15 +49,15 @@ impl NodeThroughput {
     pub fn optimal_batch_size(&self) -> u64 {
         let target_inflight_seconds = 6.0;
         let target_bytes = self.ema_bps * target_inflight_seconds;
-        
+
         let batch_size = target_bytes as u64;
         let batch_size = batch_size.clamp(GRANULAR_CHUNK_SIZE, MAX_BATCH_SIZE);
-        
+
         // Round to nearest granular chunk size
         let num_chunks = (batch_size + GRANULAR_CHUNK_SIZE - 1) / GRANULAR_CHUNK_SIZE;
         num_chunks * GRANULAR_CHUNK_SIZE
     }
-    
+
     /// Calculate how many pipeline batches to maintain.
     /// Prefetch queue size `k = ceil(RTT / chunk_transfer_time)`.
     pub fn pipeline_depth(&self) -> usize {
@@ -65,12 +65,12 @@ impl NodeThroughput {
         if self.ema_bps <= 0.0 || optimal_bytes == 0 {
             return 1;
         }
-        
+
         let chunk_transfer_time_ms = (optimal_bytes as f64 / self.ema_bps) * 1000.0;
         if chunk_transfer_time_ms <= 0.0 {
             return 1;
         }
-        
+
         let k = (self.last_rtt_ms as f64 / chunk_transfer_time_ms).ceil() as usize;
         k.clamp(1, 4) // Keep pipeline bounded
     }

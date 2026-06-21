@@ -167,7 +167,9 @@ mod tests {
     fn task_lifecycle() {
         let mut task = Task::new(
             TaskId(1),
-            TaskKind::DownloadChunk { chunk_id: ChunkId(0) },
+            TaskKind::DownloadChunk {
+                chunk_id: ChunkId(0),
+            },
             NodeId(1),
             SimTime::ZERO,
             3,
@@ -187,7 +189,9 @@ mod tests {
     fn task_retry() {
         let mut task = Task::new(
             TaskId(1),
-            TaskKind::DownloadChunk { chunk_id: ChunkId(0) },
+            TaskKind::DownloadChunk {
+                chunk_id: ChunkId(0),
+            },
             NodeId(1),
             SimTime::ZERO,
             2,

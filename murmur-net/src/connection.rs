@@ -1,9 +1,9 @@
-use std::sync::Arc;
-use tokio::net::TcpStream;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::sync::{mpsc, Mutex};
 use bytes::BytesMut;
 use murmur_core::net::NetMessage;
+use std::sync::Arc;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
+use tokio::sync::{Mutex, mpsc};
 
 use crate::framing::PostcardCodec;
 
@@ -46,7 +46,7 @@ impl PeerConnection {
     pub async fn send_message(&self, message: &NetMessage) -> anyhow::Result<()> {
         let mut buf = BytesMut::new();
         PostcardCodec::encode(message, &mut buf)?;
-        
+
         match &self.write_half {
             TransportWriteHalf::Tcp(tcp) => {
                 let mut stream = tcp.lock().await;
@@ -62,16 +62,23 @@ impl PeerConnection {
 
     pub async fn start_recv_loop(&self) -> mpsc::Receiver<NetMessage> {
         let (tx, rx) = mpsc::channel(100);
-        
-        let mut read_half = self.read_half.lock().await.take().expect("start_recv_loop called twice");
-        
+
+        let mut read_half = self
+            .read_half
+            .lock()
+            .await
+            .take()
+            .expect("start_recv_loop called twice");
+
         tokio::spawn(async move {
             let mut buf = BytesMut::with_capacity(4096);
             loop {
                 let mut temp_buf = [0u8; 1024];
                 let n = match &mut read_half {
                     TransportReadHalf::Tcp(tcp) => tcp.read(&mut temp_buf).await,
-                    TransportReadHalf::Quic(quic) => quic.read(&mut temp_buf).await
+                    TransportReadHalf::Quic(quic) => quic
+                        .read(&mut temp_buf)
+                        .await
                         .map(|x| x.unwrap_or(0))
                         .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)),
                 };
@@ -81,9 +88,9 @@ impl PeerConnection {
                     Ok(n) => n,
                     Err(_) => break,
                 };
-                
+
                 buf.extend_from_slice(&temp_buf[..n]);
-                
+
                 // Try decoding frames
                 loop {
                     match PostcardCodec::decode::<NetMessage>(&mut buf) {
@@ -100,7 +107,7 @@ impl PeerConnection {
                 }
             }
         });
-        
+
         rx
     }
 }
@@ -133,7 +140,7 @@ mod tests {
 
         let stream = tokio::net::TcpStream::connect(addr).await.unwrap();
         let conn = PeerConnection::new_tcp(2, stream);
-        
+
         let msg = NetMessage::HeartbeatPing;
         conn.send_message(&msg).await.unwrap();
 

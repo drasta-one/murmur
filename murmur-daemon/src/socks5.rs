@@ -1,9 +1,9 @@
+use crate::proxy_orchestrator::ProxyOrchestrator;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tracing::{debug, error, info};
-use std::sync::Arc;
-use crate::proxy_orchestrator::ProxyOrchestrator;
 
 pub struct Socks5Server {
     port: u16,
@@ -38,7 +38,10 @@ impl Socks5Server {
     }
 }
 
-async fn handle_client(mut stream: TcpStream, orchestrator: Arc<ProxyOrchestrator>) -> anyhow::Result<()> {
+async fn handle_client(
+    mut stream: TcpStream,
+    orchestrator: Arc<ProxyOrchestrator>,
+) -> anyhow::Result<()> {
     // 1. Handshake
     let mut header = [0u8; 2];
     stream.read_exact(&mut header).await?;
@@ -63,7 +66,8 @@ async fn handle_client(mut stream: TcpStream, orchestrator: Arc<ProxyOrchestrato
 
     let atyp = req_header[3];
     let (host, port) = match atyp {
-        0x01 => { // IPv4
+        0x01 => {
+            // IPv4
             let mut ip = [0u8; 4];
             stream.read_exact(&mut ip).await?;
             let mut port_bytes = [0u8; 2];
@@ -71,7 +75,8 @@ async fn handle_client(mut stream: TcpStream, orchestrator: Arc<ProxyOrchestrato
             let port = u16::from_be_bytes(port_bytes);
             (Ipv4Addr::from(ip).to_string(), port)
         }
-        0x03 => { // Domain Name
+        0x03 => {
+            // Domain Name
             let mut len_buf = [0u8; 1];
             stream.read_exact(&mut len_buf).await?;
             let len = len_buf[0] as usize;
@@ -82,7 +87,8 @@ async fn handle_client(mut stream: TcpStream, orchestrator: Arc<ProxyOrchestrato
             let port = u16::from_be_bytes(port_bytes);
             (String::from_utf8_lossy(&domain).to_string(), port)
         }
-        0x04 => { // IPv6
+        0x04 => {
+            // IPv6
             let mut ip = [0u8; 16];
             stream.read_exact(&mut ip).await?;
             let mut port_bytes = [0u8; 2];
@@ -96,7 +102,9 @@ async fn handle_client(mut stream: TcpStream, orchestrator: Arc<ProxyOrchestrato
     debug!("SOCKS5 CONNECT request for {}:{}", host, port);
 
     // Pass the stream to the orchestrator to route and forward
-    orchestrator.handle_new_connection(stream, host, port).await?;
+    orchestrator
+        .handle_new_connection(stream, host, port)
+        .await?;
 
     Ok(())
 }

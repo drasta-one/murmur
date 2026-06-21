@@ -1,7 +1,7 @@
+use murmur_core::types::{ChunkId, ManifestId, NodeId};
 use serde::{Deserialize, Serialize};
 use std::pin::Pin;
 use tokio_stream::{Stream, StreamExt};
-use murmur_core::types::{ChunkId, ManifestId, NodeId};
 
 pub mod proto {
     pub use murmur_proto::control::*;
@@ -85,12 +85,22 @@ pub struct LinkInfo {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum MurmurCommand {
-    StartDownload { url: String, manifest_id: ManifestId },
-    BondedFetch { url: String, output_path: String },
-    PauseDownload { manifest_id: ManifestId },
+    StartDownload {
+        url: String,
+        manifest_id: ManifestId,
+    },
+    BondedFetch {
+        url: String,
+        output_path: String,
+    },
+    PauseDownload {
+        manifest_id: ManifestId,
+    },
     LeaveCluster,
     RequestSnapshot,
-    Seed { file_path: String },
+    Seed {
+        file_path: String,
+    },
     Status,
     ListManifests,
     GetProxyStatus,
@@ -100,30 +110,93 @@ pub enum MurmurCommand {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum MurmurEvent {
     // Cluster lifecycle
-    ClusterFormed      { coordinator: NodeId, members: Vec<NodeId>, epoch: u64 },
-    CoordinatorChanged { new: NodeId, old: NodeId, reason: ElectionReason, epoch: u64 },
-    NodeJoined         { node: NodeInfo },
-    NodeLeft           { node_id: NodeId, reason: LeaveReason },
-    NodeBanned         { node_id: NodeId, reason: BanReason },
+    ClusterFormed {
+        coordinator: NodeId,
+        members: Vec<NodeId>,
+        epoch: u64,
+    },
+    CoordinatorChanged {
+        new: NodeId,
+        old: NodeId,
+        reason: ElectionReason,
+        epoch: u64,
+    },
+    NodeJoined {
+        node: NodeInfo,
+    },
+    NodeLeft {
+        node_id: NodeId,
+        reason: LeaveReason,
+    },
+    NodeBanned {
+        node_id: NodeId,
+        reason: BanReason,
+    },
 
     // Transfer lifecycle
-    ManifestReceived   { manifest_id: ManifestId, total_chunks: u32 },
-    ChunkAssigned      { chunk_id: ChunkId, assigned_to: NodeId },
-    ChunkVerified      { chunk_id: ChunkId, from_node: NodeId, duration_ms: u64 },
-    ChunkFailed        { chunk_id: ChunkId, reason: ChunkFailReason },
-    ChunkReassigned    { chunk_id: ChunkId, from: NodeId, to: NodeId, reason: String },
-    TransferComplete   { manifest_id: ManifestId, path: String, duration_ms: u64 },
-    TransferProgress   { manifest_id: ManifestId, percentage: f64, is_complete: bool },
+    ManifestReceived {
+        manifest_id: ManifestId,
+        total_chunks: u32,
+    },
+    ChunkAssigned {
+        chunk_id: ChunkId,
+        assigned_to: NodeId,
+    },
+    ChunkVerified {
+        chunk_id: ChunkId,
+        from_node: NodeId,
+        duration_ms: u64,
+    },
+    ChunkFailed {
+        chunk_id: ChunkId,
+        reason: ChunkFailReason,
+    },
+    ChunkReassigned {
+        chunk_id: ChunkId,
+        from: NodeId,
+        to: NodeId,
+        reason: String,
+    },
+    TransferComplete {
+        manifest_id: ManifestId,
+        path: String,
+        duration_ms: u64,
+    },
+    TransferProgress {
+        manifest_id: ManifestId,
+        percentage: f64,
+        is_complete: bool,
+    },
 
     // Observability
-    LinkMeasured       { from: NodeId, to: NodeId, mbps: f32, latency_ms: u32 },
-    OstSnapshot        { nodes: Vec<NodeInfo>, chunks: Vec<ChunkOwnershipInfo>, links: Vec<LinkInfo> },
-    Error              { code: ErrorCode, message: String },
-    
+    LinkMeasured {
+        from: NodeId,
+        to: NodeId,
+        mbps: f32,
+        latency_ms: u32,
+    },
+    OstSnapshot {
+        nodes: Vec<NodeInfo>,
+        chunks: Vec<ChunkOwnershipInfo>,
+        links: Vec<LinkInfo>,
+    },
+    Error {
+        code: ErrorCode,
+        message: String,
+    },
+
     // Command Responses (for CLI)
-    StatusReport { node_id: NodeId, active_peers: usize, is_coordinator: bool },
-    ManifestList { manifests: Vec<(String, String)> },
-    CommandSuccess { message: String },
+    StatusReport {
+        node_id: NodeId,
+        active_peers: usize,
+        is_coordinator: bool,
+    },
+    ManifestList {
+        manifests: Vec<(String, String)>,
+    },
+    CommandSuccess {
+        message: String,
+    },
 
     // Bonding events
     BondedFetchProgress {
@@ -168,13 +241,13 @@ impl DorRuntime {
 
     pub async fn start(&mut self) -> Result<(), DorApiError> {
         use proto::control_plane_client::ControlPlaneClient;
-        
+
         let mut cmd_rx = self.cmd_rx.take().expect("Runtime already started");
         let event_tx = self.event_tx.clone();
         let mut shutdown_rx = self.shutdown_tx.subscribe();
-        
+
         let addr = format!("http://{}", self.config.daemon_addr);
-        
+
         // Ensure we can connect to the daemon
         let client = match ControlPlaneClient::connect(addr.clone()).await {
             Ok(c) => c,
@@ -202,7 +275,10 @@ impl DorRuntime {
                                 });
                             }
                             Err(e) => {
-                                let _ = event_tx_clone.send(MurmurEvent::Error { code: ErrorCode::NetworkFailure, message: e.to_string() });
+                                let _ = event_tx_clone.send(MurmurEvent::Error {
+                                    code: ErrorCode::NetworkFailure,
+                                    message: e.to_string(),
+                                });
                             }
                         }
                     }
@@ -212,13 +288,20 @@ impl DorRuntime {
                             Ok(res) => {
                                 let r = res.into_inner();
                                 if r.success {
-                                    let _ = event_tx_clone.send(MurmurEvent::CommandSuccess { message: r.message });
+                                    let _ = event_tx_clone
+                                        .send(MurmurEvent::CommandSuccess { message: r.message });
                                 } else {
-                                    let _ = event_tx_clone.send(MurmurEvent::Error { code: ErrorCode::Internal, message: r.message });
+                                    let _ = event_tx_clone.send(MurmurEvent::Error {
+                                        code: ErrorCode::Internal,
+                                        message: r.message,
+                                    });
                                 }
                             }
                             Err(e) => {
-                                let _ = event_tx_clone.send(MurmurEvent::Error { code: ErrorCode::NetworkFailure, message: e.to_string() });
+                                let _ = event_tx_clone.send(MurmurEvent::Error {
+                                    code: ErrorCode::NetworkFailure,
+                                    message: e.to_string(),
+                                });
                             }
                         }
                     }
@@ -228,10 +311,14 @@ impl DorRuntime {
                             Ok(res) => {
                                 let r = res.into_inner();
                                 let manifests = r.manifests.into_iter().collect();
-                                let _ = event_tx_clone.send(MurmurEvent::ManifestList { manifests });
+                                let _ =
+                                    event_tx_clone.send(MurmurEvent::ManifestList { manifests });
                             }
                             Err(e) => {
-                                let _ = event_tx_clone.send(MurmurEvent::Error { code: ErrorCode::NetworkFailure, message: e.to_string() });
+                                let _ = event_tx_clone.send(MurmurEvent::Error {
+                                    code: ErrorCode::NetworkFailure,
+                                    message: e.to_string(),
+                                });
                             }
                         }
                     }
@@ -247,49 +334,66 @@ impl DorRuntime {
                                 });
                             }
                             Err(e) => {
-                                let _ = event_tx_clone.send(MurmurEvent::Error { code: ErrorCode::NetworkFailure, message: e.to_string() });
+                                let _ = event_tx_clone.send(MurmurEvent::Error {
+                                    code: ErrorCode::NetworkFailure,
+                                    message: e.to_string(),
+                                });
                             }
                         }
                     }
                     MurmurCommand::StartDownload { url, manifest_id } => {
-                        let req = tonic::Request::new(proto::StartDownloadRequest { 
-                            url, 
-                            manifest_id: manifest_id.0.to_string() 
+                        let req = tonic::Request::new(proto::StartDownloadRequest {
+                            url,
+                            manifest_id: manifest_id.0.to_string(),
                         });
                         match client.start_download(req).await {
                             Ok(res) => {
                                 let r = res.into_inner();
                                 if r.success {
-                                    let _ = event_tx_clone.send(MurmurEvent::CommandSuccess { message: r.message });
+                                    let _ = event_tx_clone
+                                        .send(MurmurEvent::CommandSuccess { message: r.message });
                                 } else {
-                                    let _ = event_tx_clone.send(MurmurEvent::Error { code: ErrorCode::Internal, message: r.message });
+                                    let _ = event_tx_clone.send(MurmurEvent::Error {
+                                        code: ErrorCode::Internal,
+                                        message: r.message,
+                                    });
                                 }
                             }
                             Err(e) => {
-                                let _ = event_tx_clone.send(MurmurEvent::Error { code: ErrorCode::NetworkFailure, message: e.to_string() });
+                                let _ = event_tx_clone.send(MurmurEvent::Error {
+                                    code: ErrorCode::NetworkFailure,
+                                    message: e.to_string(),
+                                });
                             }
                         }
                     }
                     MurmurCommand::BondedFetch { url, output_path } => {
-                        let req = tonic::Request::new(proto::BondedFetchRequest { 
-                            url, 
+                        let req = tonic::Request::new(proto::BondedFetchRequest {
+                            url,
                             output_path,
-                            chunk_size: 0 // Use default
+                            chunk_size: 0, // Use default
                         });
                         match client.bonded_fetch(req).await {
                             Ok(res) => {
                                 let r = res.into_inner();
                                 if r.success {
                                     tracing::info!("BondedFetch RPC succeeded: {}", r.message);
-                                    let _ = event_tx_clone.send(MurmurEvent::CommandSuccess { message: r.message });
+                                    let _ = event_tx_clone
+                                        .send(MurmurEvent::CommandSuccess { message: r.message });
                                 } else {
                                     tracing::error!("BondedFetch RPC failed: {}", r.message);
-                                    let _ = event_tx_clone.send(MurmurEvent::Error { code: ErrorCode::Internal, message: r.message });
+                                    let _ = event_tx_clone.send(MurmurEvent::Error {
+                                        code: ErrorCode::Internal,
+                                        message: r.message,
+                                    });
                                 }
                             }
                             Err(e) => {
                                 tracing::error!("BondedFetch RPC encountered an error: {}", e);
-                                let _ = event_tx_clone.send(MurmurEvent::Error { code: ErrorCode::NetworkFailure, message: e.to_string() });
+                                let _ = event_tx_clone.send(MurmurEvent::Error {
+                                    code: ErrorCode::NetworkFailure,
+                                    message: e.to_string(),
+                                });
                             }
                         }
                     }
@@ -297,10 +401,15 @@ impl DorRuntime {
                         let req = tonic::Request::new(proto::StopRequest {});
                         match client.stop(req).await {
                             Ok(res) => {
-                                let _ = event_tx_clone.send(MurmurEvent::CommandSuccess { message: res.into_inner().message });
+                                let _ = event_tx_clone.send(MurmurEvent::CommandSuccess {
+                                    message: res.into_inner().message,
+                                });
                             }
                             Err(e) => {
-                                let _ = event_tx_clone.send(MurmurEvent::Error { code: ErrorCode::NetworkFailure, message: e.to_string() });
+                                let _ = event_tx_clone.send(MurmurEvent::Error {
+                                    code: ErrorCode::NetworkFailure,
+                                    message: e.to_string(),
+                                });
                             }
                         }
                     }
@@ -309,17 +418,35 @@ impl DorRuntime {
                         match client.get_snapshot(req).await {
                             Ok(res) => {
                                 let r = res.into_inner();
-                                if let Ok(val) = serde_json::from_slice::<serde_json::Value>(&r.snapshot_json) {
-                                    let nodes: Vec<NodeInfo> = serde_json::from_value(val["nodes"].clone()).unwrap_or_default();
-                                    let chunks: Vec<ChunkOwnershipInfo> = serde_json::from_value(val["chunks"].clone()).unwrap_or_default();
-                                    let links: Vec<LinkInfo> = serde_json::from_value(val["links"].clone()).unwrap_or_default();
-                                    let _ = event_tx_clone.send(MurmurEvent::OstSnapshot { nodes, chunks, links });
+                                if let Ok(val) =
+                                    serde_json::from_slice::<serde_json::Value>(&r.snapshot_json)
+                                {
+                                    let nodes: Vec<NodeInfo> =
+                                        serde_json::from_value(val["nodes"].clone())
+                                            .unwrap_or_default();
+                                    let chunks: Vec<ChunkOwnershipInfo> =
+                                        serde_json::from_value(val["chunks"].clone())
+                                            .unwrap_or_default();
+                                    let links: Vec<LinkInfo> =
+                                        serde_json::from_value(val["links"].clone())
+                                            .unwrap_or_default();
+                                    let _ = event_tx_clone.send(MurmurEvent::OstSnapshot {
+                                        nodes,
+                                        chunks,
+                                        links,
+                                    });
                                 } else {
-                                    let _ = event_tx_clone.send(MurmurEvent::Error { code: ErrorCode::Internal, message: "Failed to parse snapshot".into() });
+                                    let _ = event_tx_clone.send(MurmurEvent::Error {
+                                        code: ErrorCode::Internal,
+                                        message: "Failed to parse snapshot".into(),
+                                    });
                                 }
                             }
                             Err(e) => {
-                                let _ = event_tx_clone.send(MurmurEvent::Error { code: ErrorCode::NetworkFailure, message: e.to_string() });
+                                let _ = event_tx_clone.send(MurmurEvent::Error {
+                                    code: ErrorCode::NetworkFailure,
+                                    message: e.to_string(),
+                                });
                             }
                         }
                     }
@@ -350,10 +477,10 @@ impl DorRuntime {
                                             }
                                             proto::daemon_event::Event::Progress(p) => {
                                                 if let Ok(id) = uuid::Uuid::parse_str(&p.manifest_id) {
-                                                    let _ = event_tx_ev.send(MurmurEvent::TransferProgress { 
-                                                        manifest_id: murmur_core::types::ManifestId(id), 
-                                                        percentage: p.percentage as f64, 
-                                                        is_complete: p.is_complete 
+                                                    let _ = event_tx_ev.send(MurmurEvent::TransferProgress {
+                                                        manifest_id: murmur_core::types::ManifestId(id),
+                                                        percentage: p.percentage as f64,
+                                                        is_complete: p.is_complete
                                                     });
                                                 }
                                             }

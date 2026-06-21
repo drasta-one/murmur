@@ -1,14 +1,23 @@
-use serde::{Deserialize, Serialize};
 use crate::types::NodeId;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum RpcRequest {
     Status,
-    Seed { url: String },
+    Seed {
+        url: String,
+    },
     ListManifests,
-    Reassemble { manifest_id: String, out_path: String },
-    StartDownload { manifest_id: String },
-    Progress { manifest_id: String },
+    Reassemble {
+        manifest_id: String,
+        out_path: String,
+    },
+    StartDownload {
+        manifest_id: String,
+    },
+    Progress {
+        manifest_id: String,
+    },
     Stop,
 }
 
@@ -27,6 +36,10 @@ pub enum RpcResponse {
         percentage: f64,
         is_complete: bool,
     },
-    Ok { message: String },
-    Error { message: String },
+    Ok {
+        message: String,
+    },
+    Error {
+        message: String,
+    },
 }

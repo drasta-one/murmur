@@ -1,8 +1,8 @@
+use mdns_sd::{ServiceDaemon, ServiceEvent, ServiceInfo};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::{RwLock, mpsc};
 use tracing::info;
-use mdns_sd::{ServiceDaemon, ServiceEvent, ServiceInfo};
 
 pub const DOR_SERVICE_TYPE: &str = "_murmur._tcp.local.";
 
@@ -32,9 +32,9 @@ impl Discovery {
     pub fn start_broadcasting(&self, port: u16) -> anyhow::Result<()> {
         let instance_name = format!("murmur-node-{}", self.node_id);
         let host_name = format!("{}.local.", instance_name);
-        
+
         let my_ip = "0.0.0.0"; // Will bind to all interfaces
-        
+
         let mut properties = HashMap::new();
         properties.insert("node_id".to_string(), self.node_id.to_string());
 
@@ -56,7 +56,7 @@ impl Discovery {
         let receiver = self.daemon.browse(DOR_SERVICE_TYPE)?;
         let (tx, rx) = mpsc::channel(100);
         let peers = self.peers.clone();
-        
+
         tokio::spawn(async move {
             while let Ok(event) = receiver.recv_async().await {
                 match event {
@@ -78,7 +78,7 @@ impl Discovery {
                         }
                     }
                     ServiceEvent::ServiceRemoved(_type_name, _fullname) => {
-                        // We would need to map fullname back to node_id to remove it, 
+                        // We would need to map fullname back to node_id to remove it,
                         // or just scan our map. For simplicity, we skip precise removal logic here,
                         // and rely on TCP drops to actually know when a peer dies.
                     }
@@ -86,7 +86,7 @@ impl Discovery {
                 }
             }
         });
-        
+
         Ok(rx)
     }
 }

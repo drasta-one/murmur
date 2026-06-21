@@ -37,10 +37,7 @@ pub async fn fetch_range(
         req = req.header(reqwest::header::IF_RANGE, e);
     }
 
-    let response = req
-        .send()
-        .await
-        .context("HTTP Range GET request failed")?;
+    let response = req.send().await.context("HTTP Range GET request failed")?;
 
     let status = response.status();
 
@@ -168,8 +165,8 @@ pub async fn fetch_ranges_concurrent(
     etag: Option<&str>,
     max_concurrent: usize,
 ) -> Vec<Result<(u32, FetchResult)>> {
-    use tokio::sync::Semaphore;
     use std::sync::Arc;
+    use tokio::sync::Semaphore;
 
     // 1. Group assignments into contiguous blocks (up to 8MB)
     let mut sorted_assignments = assignments.to_vec();
@@ -178,7 +175,7 @@ pub async fn fetch_ranges_concurrent(
     let mut blocks: Vec<Vec<(u32, u64, u32)>> = Vec::new();
     let mut current_block: Vec<(u32, u64, u32)> = Vec::new();
     let mut current_block_end = 0;
-    
+
     // 8 MB max aggregate size limits memory usage per request
     const MAX_AGGREGATE_SIZE: u64 = 8 * 1024 * 1024;
 
@@ -190,7 +187,7 @@ pub async fn fetch_ranges_concurrent(
         } else {
             let block_start = current_block[0].1;
             let block_size = current_block_end - block_start;
-            
+
             if offset == current_block_end && (block_size + size as u64) <= MAX_AGGREGATE_SIZE {
                 current_block.push(ass);
                 current_block_end = offset + size as u64;
@@ -216,23 +213,24 @@ pub async fn fetch_ranges_concurrent(
 
         handles.push(tokio::spawn(async move {
             let _permit = permit.acquire().await.unwrap();
-            
+
             let block_start = block[0].1;
             let total_size: u32 = block.iter().map(|a| a.2).sum();
-            
+
             let start_time = std::time::Instant::now();
-            
+
             debug!(
                 chunks = block.len(),
                 total_size = total_size,
                 "Starting aggregated HTTP Range fetch"
             );
-            
-            let fetch_res = fetch_range(&client, &url, block_start, total_size, etag.as_deref()).await;
+
+            let fetch_res =
+                fetch_range(&client, &url, block_start, total_size, etag.as_deref()).await;
             let elapsed_ms = start_time.elapsed().as_millis() as u64;
-            
+
             let mut results = Vec::new();
-            
+
             match fetch_res {
                 Ok(data) => {
                     let throughput_bps = if elapsed_ms > 0 {
@@ -240,23 +238,27 @@ pub async fn fetch_ranges_concurrent(
                     } else {
                         data.len() as u64 * 1_000_000
                     };
-                    
+
                     let mut cursor = 0;
                     for &(id, _offset, size) in &block {
                         if cursor + size as usize > data.len() {
-                            results.push(Err(anyhow::anyhow!("Aggregated data too small for chunks")));
+                            results
+                                .push(Err(anyhow::anyhow!("Aggregated data too small for chunks")));
                             break;
                         }
                         let chunk_data = data[cursor..cursor + size as usize].to_vec();
                         let hash = *blake3::hash(&chunk_data).as_bytes();
-                        
-                        results.push(Ok((id, FetchResult {
-                            data: chunk_data,
-                            hash,
-                            elapsed_ms, // Give same latency metric to all slices
-                            throughput_bps, // Give same throughput metric to all slices
-                        })));
-                        
+
+                        results.push(Ok((
+                            id,
+                            FetchResult {
+                                data: chunk_data,
+                                hash,
+                                elapsed_ms,     // Give same latency metric to all slices
+                                throughput_bps, // Give same throughput metric to all slices
+                            },
+                        )));
+
                         cursor += size as usize;
                     }
                 }
@@ -293,7 +295,7 @@ mod tests {
         let result = FetchResult {
             data: vec![0u8; 1_000_000], // 1 MB
             hash: [0u8; 32],
-            elapsed_ms: 1000, // 1 second
+            elapsed_ms: 1000,          // 1 second
             throughput_bps: 1_000_000, // 1 MB/s
         };
         assert_eq!(result.throughput_bps, 1_000_000);

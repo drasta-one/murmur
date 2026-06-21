@@ -1,6 +1,6 @@
 use bytes::{Buf, BufMut, BytesMut};
 use serde::{Deserialize, Serialize};
- // As a placeholder, we might use MessagePayload directly later
+// As a placeholder, we might use MessagePayload directly later
 
 /// A length-prefixed frame codec for postcard.
 pub struct PostcardCodec;
@@ -9,11 +9,11 @@ impl PostcardCodec {
     pub fn encode<T: Serialize>(item: &T, dst: &mut BytesMut) -> anyhow::Result<()> {
         let serialized = postcard::to_allocvec(item)?;
         let len = serialized.len() as u32;
-        
+
         dst.reserve(4 + serialized.len());
         dst.put_u32(len);
         dst.put_slice(&serialized);
-        
+
         Ok(())
     }
 
@@ -34,7 +34,7 @@ impl PostcardCodec {
         // We have enough data
         src.advance(4);
         let data = src.split_to(length);
-        
+
         let item: T = postcard::from_bytes(&data)?;
         Ok(Some(item))
     }
@@ -58,7 +58,7 @@ mod tests {
 
         let decoded = PostcardCodec::decode::<NetMessage>(&mut buffer).unwrap();
         assert!(decoded.is_some());
-        
+
         match decoded.unwrap() {
             NetMessage::HeartbeatPing => {}
             _ => panic!("Decoded wrong message type"),

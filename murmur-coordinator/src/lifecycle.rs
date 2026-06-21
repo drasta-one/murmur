@@ -27,10 +27,7 @@ pub enum CoordinatorState {
         since: SimTime,
     },
     /// The coordinator has died; waiting for re-election.
-    Dead {
-        previous: NodeId,
-        died_at: SimTime,
-    },
+    Dead { previous: NodeId, died_at: SimTime },
 }
 
 /// Manages the coordinator lifecycle state machine.
@@ -106,9 +103,7 @@ impl CoordinatorLifecycle {
     pub fn start_election(&mut self, at: SimTime) {
         // If a coordinator was active, record their death
         if let CoordinatorState::Active {
-            coordinator,
-            since,
-            ..
+            coordinator, since, ..
         } = &self.state
         {
             if let Some(record) = self.history.last_mut() {
@@ -148,7 +143,13 @@ impl CoordinatorLifecycle {
 
     /// Transition from Recovering to Active state.
     pub fn complete_recovery(&mut self, at: SimTime) {
-        if let CoordinatorState::Recovering { coordinator, term, since: _, .. } = self.state {
+        if let CoordinatorState::Recovering {
+            coordinator,
+            term,
+            since: _,
+            ..
+        } = self.state
+        {
             self.state = CoordinatorState::Active {
                 coordinator,
                 term,
@@ -163,11 +164,14 @@ impl CoordinatorLifecycle {
         }
     }
 
-
     /// Transition to Dead state (coordinator crashed/disconnected).
     pub fn coordinator_died(&mut self, at: SimTime) {
-        if let CoordinatorState::Active { coordinator, since, .. } 
-             | CoordinatorState::Recovering { coordinator, since, .. } = &self.state
+        if let CoordinatorState::Active {
+            coordinator, since, ..
+        }
+        | CoordinatorState::Recovering {
+            coordinator, since, ..
+        } = &self.state
         {
             let previous = *coordinator;
             let elected_at = *since;
@@ -234,7 +238,7 @@ mod tests {
         assert!(matches!(lc.state(), CoordinatorState::Recovering { .. }));
         assert!(!lc.is_active());
         assert!(lc.is_recovering());
-        
+
         // Recovering → Active
         lc.complete_recovery(SimTime(200));
         assert!(lc.is_active());

@@ -154,9 +154,7 @@ mod tests {
 
         assert_eq!(
             change,
-            MembershipChange::AlreadyMember {
-                node_id: NodeId(1),
-            }
+            MembershipChange::AlreadyMember { node_id: NodeId(1) }
         );
         assert_eq!(mgr.member_count(), 1);
     }

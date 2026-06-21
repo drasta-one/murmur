@@ -30,7 +30,10 @@ pub struct OverlayStateTable {
 impl OverlayStateTable {
     /// Create a new, empty state table with the given cluster configuration.
     pub fn new(config: ClusterConfig) -> Self {
-        debug!("OverlayStateTable created with max_nodes={}", config.max_nodes);
+        debug!(
+            "OverlayStateTable created with max_nodes={}",
+            config.max_nodes
+        );
         Self {
             nodes: HashMap::new(),
             coordinator: None,
@@ -140,7 +143,11 @@ impl OverlayStateTable {
     }
 
     /// Converts the node's authoritative state into an OstFragment for the given node.
-    pub fn to_fragment(&self, node_id: NodeId, now: murmur_core::types::SimTime) -> murmur_core::chunk::OstFragment {
+    pub fn to_fragment(
+        &self,
+        node_id: NodeId,
+        now: murmur_core::types::SimTime,
+    ) -> murmur_core::chunk::OstFragment {
         let mut owned_chunks = Vec::new();
         for (chunk_id, ownership) in &self.chunk_ownership {
             // Include verified chunks
@@ -150,7 +157,7 @@ impl OverlayStateTable {
                 owned_chunks.push((*chunk_id, ownership.status));
             }
         }
-        
+
         murmur_core::chunk::OstFragment {
             node_id,
             epoch: self.term,
@@ -165,14 +172,18 @@ impl OverlayStateTable {
             return; // Ignore stale fragments
         }
         for (chunk_id, status) in fragment.owned_chunks {
-            let entry = self.chunk_ownership.entry(chunk_id)
+            let entry = self
+                .chunk_ownership
+                .entry(chunk_id)
                 .or_insert_with(|| murmur_core::chunk::ChunkOwnership::new(chunk_id));
-                
+
             if status > entry.status {
                 entry.status = status;
                 if status.is_terminal() {
                     entry.verified_by = Some(fragment.node_id);
-                } else if status == murmur_core::chunk::ChunkStatus::InProgress || status == murmur_core::chunk::ChunkStatus::Assigned {
+                } else if status == murmur_core::chunk::ChunkStatus::InProgress
+                    || status == murmur_core::chunk::ChunkStatus::Assigned
+                {
                     entry.assigned_to = Some(fragment.node_id);
                 }
             }
@@ -337,24 +348,30 @@ mod tests {
                 assigned_to: Some(NodeId(5)),
                 verified_by: None,
                 epoch: 0,
-            }
+            },
         );
 
         // Fragment has InProgress (higher than Assigned)
         let fragment = murmur_core::chunk::OstFragment {
             node_id: NodeId(5),
             epoch: 0,
-            owned_chunks: vec![(murmur_core::types::ChunkId(1), murmur_core::chunk::ChunkStatus::InProgress)],
+            owned_chunks: vec![(
+                murmur_core::types::ChunkId(1),
+                murmur_core::chunk::ChunkStatus::InProgress,
+            )],
             last_updated: SimTime::ZERO,
         };
         table.merge_fragment(fragment);
 
-        let owner = table.chunk_ownership.get(&murmur_core::types::ChunkId(1)).unwrap();
+        let owner = table
+            .chunk_ownership
+            .get(&murmur_core::types::ChunkId(1))
+            .unwrap();
         assert_eq!(owner.status, murmur_core::chunk::ChunkStatus::InProgress);
         assert_eq!(owner.assigned_to, Some(NodeId(5)));
     }
 
-    #[test]  
+    #[test]
     fn merge_does_not_regress_verified_chunks() {
         let mut table = default_table();
         table.chunk_ownership.insert(
@@ -365,19 +382,25 @@ mod tests {
                 assigned_to: None,
                 verified_by: Some(NodeId(2)),
                 epoch: 0,
-            }
+            },
         );
 
         // Fragment reports Assigned (lower than Verified)
         let fragment = murmur_core::chunk::OstFragment {
             node_id: NodeId(5),
             epoch: 0,
-            owned_chunks: vec![(murmur_core::types::ChunkId(1), murmur_core::chunk::ChunkStatus::Assigned)],
+            owned_chunks: vec![(
+                murmur_core::types::ChunkId(1),
+                murmur_core::chunk::ChunkStatus::Assigned,
+            )],
             last_updated: SimTime::ZERO,
         };
         table.merge_fragment(fragment);
 
-        let owner = table.chunk_ownership.get(&murmur_core::types::ChunkId(1)).unwrap();
+        let owner = table
+            .chunk_ownership
+            .get(&murmur_core::types::ChunkId(1))
+            .unwrap();
         assert_eq!(owner.status, murmur_core::chunk::ChunkStatus::Verified);
         assert_eq!(owner.verified_by, Some(NodeId(2)));
     }
@@ -389,14 +412,20 @@ mod tests {
         let frag1 = murmur_core::chunk::OstFragment {
             node_id: NodeId(5),
             epoch: 0,
-            owned_chunks: vec![(murmur_core::types::ChunkId(1), murmur_core::chunk::ChunkStatus::InProgress)],
+            owned_chunks: vec![(
+                murmur_core::types::ChunkId(1),
+                murmur_core::chunk::ChunkStatus::InProgress,
+            )],
             last_updated: SimTime::ZERO,
         };
-        
+
         let frag2 = murmur_core::chunk::OstFragment {
             node_id: NodeId(6),
             epoch: 0,
-            owned_chunks: vec![(murmur_core::types::ChunkId(1), murmur_core::chunk::ChunkStatus::Assigned)],
+            owned_chunks: vec![(
+                murmur_core::types::ChunkId(1),
+                murmur_core::chunk::ChunkStatus::Assigned,
+            )],
             last_updated: SimTime::ZERO,
         };
 
@@ -404,7 +433,10 @@ mod tests {
         table.merge_fragment(frag2);
         table.merge_fragment(frag1);
 
-        let owner = table.chunk_ownership.get(&murmur_core::types::ChunkId(1)).unwrap();
+        let owner = table
+            .chunk_ownership
+            .get(&murmur_core::types::ChunkId(1))
+            .unwrap();
         assert_eq!(owner.status, murmur_core::chunk::ChunkStatus::InProgress);
         assert_eq!(owner.assigned_to, Some(NodeId(5)));
     }
@@ -417,12 +449,20 @@ mod tests {
         let fragment = murmur_core::chunk::OstFragment {
             node_id: NodeId(5),
             epoch: 1, // older epoch
-            owned_chunks: vec![(murmur_core::types::ChunkId(1), murmur_core::chunk::ChunkStatus::Verified)],
+            owned_chunks: vec![(
+                murmur_core::types::ChunkId(1),
+                murmur_core::chunk::ChunkStatus::Verified,
+            )],
             last_updated: SimTime::ZERO,
         };
-        
+
         table.merge_fragment(fragment);
-        
-        assert!(table.chunk_ownership.get(&murmur_core::types::ChunkId(1)).is_none());
+
+        assert!(
+            table
+                .chunk_ownership
+                .get(&murmur_core::types::ChunkId(1))
+                .is_none()
+        );
     }
 }

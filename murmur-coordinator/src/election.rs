@@ -147,9 +147,7 @@ impl BullyElection {
         // Send Election Start to all higher nodes
         higher_nodes
             .iter()
-            .map(|_| ElectionMessage::Start {
-                from: self.node_id,
-            })
+            .map(|_| ElectionMessage::Start { from: self.node_id })
             .collect()
     }
 
@@ -167,9 +165,7 @@ impl BullyElection {
 
         if self.node_id > from {
             // Respond: "I'm alive, stand down."
-            messages.push(ElectionMessage::Alive {
-                from: self.node_id,
-            });
+            messages.push(ElectionMessage::Alive { from: self.node_id });
 
             // Start our own election if idle
             if self.state == ElectionState::Idle {
@@ -267,9 +263,18 @@ mod tests {
         let msgs = election.initiate_election(&all, SimTime::ZERO);
 
         // Node 3 is highest — wins immediately, sends victory to 1 and 2
-        assert_eq!(election.state, ElectionState::Won { term: 1, at: SimTime::ZERO });
+        assert_eq!(
+            election.state,
+            ElectionState::Won {
+                term: 1,
+                at: SimTime::ZERO
+            }
+        );
         assert_eq!(msgs.len(), 2);
-        assert!(msgs.iter().all(|m| matches!(m, ElectionMessage::Victory { .. })));
+        assert!(
+            msgs.iter()
+                .all(|m| matches!(m, ElectionMessage::Victory { .. }))
+        );
         assert!(election.is_coordinator());
     }
 
@@ -281,9 +286,15 @@ mod tests {
         let msgs = election.initiate_election(&all, SimTime::ZERO);
 
         // Node 1 sends Start to nodes 2 and 3
-        assert!(matches!(election.state, ElectionState::WaitingForResponses { .. }));
+        assert!(matches!(
+            election.state,
+            ElectionState::WaitingForResponses { .. }
+        ));
         assert_eq!(msgs.len(), 2);
-        assert!(msgs.iter().all(|m| matches!(m, ElectionMessage::Start { .. })));
+        assert!(
+            msgs.iter()
+                .all(|m| matches!(m, ElectionMessage::Start { .. }))
+        );
     }
 
     #[test]
@@ -294,7 +305,10 @@ mod tests {
         let msgs = election3.handle_election_start(NodeId(1), &all, SimTime(100));
 
         // Node 3 responds with Alive and starts own election (wins immediately)
-        assert!(msgs.iter().any(|m| matches!(m, ElectionMessage::Alive { .. })));
+        assert!(
+            msgs.iter()
+                .any(|m| matches!(m, ElectionMessage::Alive { .. }))
+        );
         assert!(election3.is_coordinator());
     }
 
@@ -308,7 +322,9 @@ mod tests {
 
         assert_eq!(
             election1.state,
-            ElectionState::Yielded { yielded_to: NodeId(3) }
+            ElectionState::Yielded {
+                yielded_to: NodeId(3)
+            }
         );
         assert!(!election1.is_coordinator());
     }
@@ -365,7 +381,10 @@ mod tests {
         let all = vec![NodeId(1), NodeId(2)];
         let mut election = BullyElection::new(NodeId(1), 5000);
         election.initiate_election(&all, SimTime::ZERO);
-        assert!(matches!(election.state, ElectionState::WaitingForResponses { .. }));
+        assert!(matches!(
+            election.state,
+            ElectionState::WaitingForResponses { .. }
+        ));
 
         election.reset();
         assert_eq!(election.state, ElectionState::Idle);

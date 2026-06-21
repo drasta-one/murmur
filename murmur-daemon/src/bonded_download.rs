@@ -13,9 +13,9 @@ use murmur_core::manifest::Manifest;
 use murmur_core::node::NodeConfig;
 use murmur_core::types::{ChunkId, ManifestId, NodeId};
 use murmur_scheduler::strategy::{BandwidthWeightedStrategy, ChunkAssignment, SchedulingStrategy};
-use tracing::{info, warn, debug, error};
+use tracing::{debug, error, info, warn};
 
-use crate::url_manifest::{self, UrlResourceInfo, DEFAULT_BONDED_CHUNK_SIZE};
+use crate::url_manifest::{self, DEFAULT_BONDED_CHUNK_SIZE, UrlResourceInfo};
 use crate::wan_fetch;
 
 /// Status of a bonded download.
@@ -129,7 +129,7 @@ impl BondedDownload {
         let mut batch = Vec::new();
         let mut batch_bytes = 0;
         let max_batch_bytes = 8 * 1024 * 1024; // 8 MB
-        
+
         while let Some(chunk_id) = self.unassigned_chunks.front().copied() {
             if let Some(chunk_meta) = self.manifest.get_chunk(chunk_id) {
                 if !batch.is_empty() && batch_bytes + chunk_meta.size as u64 > max_batch_bytes {
@@ -142,7 +142,7 @@ impl BondedDownload {
                 self.unassigned_chunks.pop_front(); // skip invalid
             }
         }
-        
+
         batch
     }
 
@@ -156,7 +156,10 @@ impl BondedDownload {
 
     /// Get the combined effective bandwidth across all nodes.
     pub fn combined_bandwidth_bps(&self) -> u64 {
-        self.node_speeds.values().map(|s| s.avg_throughput_bps).sum()
+        self.node_speeds
+            .values()
+            .map(|s| s.avg_throughput_bps)
+            .sum()
     }
 
     /// Get overall progress as a percentage.
@@ -264,32 +267,55 @@ pub async fn execute_local_fetch(
     for result in results {
         match result {
             Ok((chunk_id, fetch_result)) => {
-                let offset = assignments.iter().find(|(id, _, _)| id.0 == chunk_id).unwrap().1;
-                
+                let offset = assignments
+                    .iter()
+                    .find(|(id, _, _)| id.0 == chunk_id)
+                    .unwrap()
+                    .1;
+
                 // Store the chunk to disk
-                state.storage.write_chunk(
-                    manifest_id,
-                    ChunkId(chunk_id),
-                    &fetch_result.data,
-                    offset,
-                ).await?;
+                state
+                    .storage
+                    .write_chunk(manifest_id, ChunkId(chunk_id), &fetch_result.data, offset)
+                    .await?;
 
                 // Register chunk as received locally
-                state.tracker.write().await.mark_chunk_received(manifest_id, ChunkId(chunk_id));
+                state
+                    .tracker
+                    .write()
+                    .await
+                    .mark_chunk_received(manifest_id, ChunkId(chunk_id));
 
                 // Broadcast Have to peers
-                let msg = murmur_core::net::NetMessage::Have { manifest_id, chunk_id: ChunkId(chunk_id) };
+                let msg = murmur_core::net::NetMessage::Have {
+                    manifest_id,
+                    chunk_id: ChunkId(chunk_id),
+                };
                 let conns = state.connections.read().await;
                 for (id, conn) in conns.iter() {
                     let _ = conn.send_message(&msg).await;
                 }
-                
+
                 // Check if file is complete (in case we were the only node fetching and just finished)
-                let is_complete = state.tracker.read().await.get_progress(manifest_id).map(|p| p.is_complete()).unwrap_or(false);
+                let is_complete = state
+                    .tracker
+                    .read()
+                    .await
+                    .get_progress(manifest_id)
+                    .map(|p| p.is_complete())
+                    .unwrap_or(false);
                 if is_complete {
-                    if let Some(dest) = state.download_destinations.read().await.get(&manifest_id).cloned() {
+                    if let Some(dest) = state
+                        .download_destinations
+                        .read()
+                        .await
+                        .get(&manifest_id)
+                        .cloned()
+                    {
                         info!("Bonded Download complete! Reassembling to {}", dest);
-                        if let Some(manifest) = state.manifests.read().await.get(&manifest_id).cloned() {
+                        if let Some(manifest) =
+                            state.manifests.read().await.get(&manifest_id).cloned()
+                        {
                             if let Err(e) = state.storage.reassemble_file(&manifest, &dest).await {
                                 tracing::error!("Failed to reassemble file: {}", e);
                             }
@@ -323,7 +349,10 @@ pub async fn execute_local_fetch(
 
     info!(
         chunks_downloaded = fetch_results.len(),
-        total_bytes = fetch_results.iter().map(|r| r.data.len() as u64).sum::<u64>(),
+        total_bytes = fetch_results
+            .iter()
+            .map(|r| r.data.len() as u64)
+            .sum::<u64>(),
         "Local bonded fetch complete"
     );
 
@@ -347,9 +376,7 @@ pub async fn initiate_bonded_download(
     let url_info = url_manifest::probe_url(url).await?;
 
     if !url_info.supports_ranges && nodes.len() > 1 {
-        warn!(
-            "Server does not support Range requests; falling back to single-node download"
-        );
+        warn!("Server does not support Range requests; falling back to single-node download");
         // Still proceed with single-node assignment
     }
 
@@ -400,31 +427,32 @@ pub fn handle_request_more_work(
         let mut bonded_downloads = state.bonded_downloads.write().await;
         let mut batch = Vec::new();
         let mut url = String::new();
-        
+
         if let Some(download) = bonded_downloads.get_mut(&manifest_id) {
             batch = download.dispense_batch();
             url = download.url.clone();
         }
-        
+
         // Drop the lock before awaiting on network/spawn!
         drop(bonded_downloads);
-        
+
         if batch.is_empty() {
             return;
         }
-        
+
         tracing::info!(
             manifest_id = %manifest_id,
             node_id = node_id.0,
             chunks = batch.len(),
             "Dispensed next sliding-window batch via Work Stealing"
         );
-        
+
         if node_id == state.node_id {
             // Local execution
             let state_clone = state.clone();
             tokio::spawn(async move {
-                let _ = execute_local_fetch(&url, &batch, manifest_id, state_clone.clone(), 4).await;
+                let _ =
+                    execute_local_fetch(&url, &batch, manifest_id, state_clone.clone(), 4).await;
                 handle_request_more_work(state_clone.clone(), manifest_id, node_id).await;
             });
         } else {
@@ -459,7 +487,12 @@ mod tests {
             content_type: None,
             suggested_filename: Some("test.bin".into()),
         };
-        url_manifest::manifest_from_url_info(&info, "https://example.com/file.bin", "test.bin", chunk_size)
+        url_manifest::manifest_from_url_info(
+            &info,
+            "https://example.com/file.bin",
+            "test.bin",
+            chunk_size,
+        )
     }
 
     fn make_test_nodes() -> Vec<(NodeId, NodeConfig)> {
@@ -467,7 +500,7 @@ mod tests {
             (
                 NodeId(1),
                 NodeConfig {
-                    wan_bandwidth: 625_000,  // 5 Mbps = 625 KB/s
+                    wan_bandwidth: 625_000, // 5 Mbps = 625 KB/s
                     ..Default::default()
                 },
             ),
@@ -595,8 +628,8 @@ mod tests {
             NodeId(1),
         );
 
-        download.record_speed(NodeId(1), 625_000, 1_000_000);   // 5 Mbps
-        download.record_speed(NodeId(2), 2_500_000, 1_000_000);  // 20 Mbps
+        download.record_speed(NodeId(1), 625_000, 1_000_000); // 5 Mbps
+        download.record_speed(NodeId(2), 2_500_000, 1_000_000); // 20 Mbps
 
         // Combined: 625K + 2.5M = 3.125M bytes/sec = 25 Mbps
         assert_eq!(download.combined_bandwidth_bps(), 3_125_000);

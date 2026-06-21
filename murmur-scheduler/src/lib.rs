@@ -14,6 +14,8 @@ pub mod strategy;
 pub mod task_queue;
 
 pub use chunk_scheduler::ChunkScheduler;
-pub use reassignment::{reassign_chunks, ReassignmentResult};
-pub use strategy::{BandwidthWeightedStrategy, ChunkAssignment, RoundRobinStrategy, SchedulingStrategy};
+pub use reassignment::{ReassignmentResult, reassign_chunks};
+pub use strategy::{
+    BandwidthWeightedStrategy, ChunkAssignment, RoundRobinStrategy, SchedulingStrategy,
+};
 pub use task_queue::{TaskPriority, TaskQueue};

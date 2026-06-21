@@ -3,8 +3,8 @@
 //! Tasks are ordered by priority, then by creation time (FIFO within
 //! the same priority level).
 
-use std::collections::BinaryHeap;
 use std::cmp::Ordering;
+use std::collections::BinaryHeap;
 
 use murmur_core::task::Task;
 
@@ -122,7 +122,9 @@ mod tests {
     fn make_task(id: u64) -> Task {
         Task::new(
             TaskId(id),
-            TaskKind::DownloadChunk { chunk_id: ChunkId(id as u32) },
+            TaskKind::DownloadChunk {
+                chunk_id: ChunkId(id as u32),
+            },
             NodeId(1),
             SimTime::ZERO,
             3,
