@@ -1,0 +1,15 @@
+[package]
+name = "murmur-coordinator"
+description = "Coordinator election and lifecycle for Murmur"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+murmur-core = { path = "../murmur-core" }
+serde = { workspace = true }
+tracing = { workspace = true }
+
+

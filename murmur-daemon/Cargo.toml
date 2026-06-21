@@ -1,0 +1,35 @@
+[package]
+name = "murmur-daemon"
+description = "The main asynchronous DOR node runtime daemon"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+murmur-core = { path = "../murmur-core" }
+murmur-api = { path = "../murmur-api" }
+murmur-proto = { path = "../murmur-proto" }
+tonic = { workspace = true }
+tokio-stream = { workspace = true }
+murmur-coordinator = { path = "../murmur-coordinator" }
+murmur-overlay = { path = "../murmur-overlay" }
+murmur-scheduler = { path = "../murmur-scheduler" }
+murmur-net = { path = "../murmur-net" }
+murmur-storage = { path = "../murmur-storage" }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+anyhow = { workspace = true }
+clap = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+rand = { workspace = true }
+bytes = { workspace = true }
+blake3.workspace = true
+uuid.workspace = true
+reqwest = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3.27.0"

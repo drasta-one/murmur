@@ -1,0 +1,17 @@
+[package]
+name = "murmur-core"
+description = "Core primitives for the Murmur Swarm Runtime"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+blake3 = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+tokio = { workspace = true, features = ["io-util"] }
+
+

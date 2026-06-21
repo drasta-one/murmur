@@ -1,0 +1,222 @@
+syntax = "proto3";
+package murmur.control.v1;
+
+service ControlPlane {
+    // Coordinator -> All nodes
+    rpc StreamClusterEvents(EventSubscribeRequest) returns (stream ClusterEvent);
+    
+    // Any node -> Coordinator
+    rpc ReportChunkVerified(ChunkVerifiedReport) returns (Acknowledgement);
+    rpc ReportOstFragment(OstFragmentReport) returns (Acknowledgement);
+    
+    // CLI -> Daemon
+    rpc StartDownload(StartDownloadRequest) returns (StartDownloadResponse);
+    rpc GetSnapshot(SnapshotRequest) returns (SnapshotResponse);
+    
+    // Commands for the daemon
+    rpc Status(StatusRequest) returns (StatusResponse);
+    rpc Seed(SeedRequest) returns (SeedResponse);
+    rpc ListManifests(ListManifestsRequest) returns (ListManifestsResponse);
+    rpc GetProxyStatus(ProxyStatusRequest) returns (ProxyStatusResponse);
+    rpc Stop(StopRequest) returns (StopResponse);
+    
+    // And for progress polling/events from the CLI to Daemon
+    rpc StreamDaemonEvents(DaemonEventSubscribeRequest) returns (stream DaemonEvent);
+
+    // ─── Bonding RPCs ────────────────────────────────────────
+    // CLI -> Coordinator: initiate a multi-WAN bonded download
+    rpc BondedFetch(BondedFetchRequest) returns (BondedFetchResponse);
+
+    // Node -> Coordinator: report chunk download speed for rebalancing
+    rpc ReportChunkSpeed(ChunkSpeedReport) returns (Acknowledgement);
+
+    // Coordinator -> Node: assign URL byte ranges for bonded download
+    rpc AssignFetchRanges(FetchRangeAssignment) returns (Acknowledgement);
+}
+
+// ---------------------------------------------------------
+// P2P Swarm Control Plane Messages
+// ---------------------------------------------------------
+
+message EventSubscribeRequest {
+    uint64 node_id = 1;
+}
+
+message ClusterEvent {
+    // We can expand this later
+    oneof event {
+        NodeJoinedEvent node_joined = 1;
+        NodeLeftEvent node_left = 2;
+    }
+}
+
+message NodeJoinedEvent {
+    uint64 node_id = 1;
+}
+
+message NodeLeftEvent {
+    uint64 node_id = 1;
+}
+
+message ChunkVerifiedReport {
+    uint64 node_id = 1;
+    string manifest_id = 2;
+    uint32 chunk_id = 3;
+}
+
+message OstFragmentReport {
+    uint64 node_id = 1;
+    uint64 epoch = 2;
+    // We can add serialized fragments later
+}
+
+message Acknowledgement {
+    bool success = 1;
+    string message = 2;
+}
+
+// ---------------------------------------------------------
+// CLI -> Daemon Control Plane Messages
+// ---------------------------------------------------------
+
+message StartDownloadRequest {
+    string url = 1;
+    string manifest_id = 2;
+}
+
+message StartDownloadResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+message SnapshotRequest {}
+
+message SnapshotResponse {
+    bytes snapshot_json = 1;
+}
+
+message StatusRequest {}
+
+message StatusResponse {
+    uint64 node_id = 1;
+    uint64 active_peers = 2;
+    bool is_coordinator = 3;
+}
+
+message SeedRequest {
+    string file_path = 1;
+}
+
+message SeedResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+message ListManifestsRequest {}
+
+message ListManifestsResponse {
+    map<string, string> manifests = 1;
+}
+
+message ProxyStatusRequest {}
+
+message ProxyStatusResponse {
+    uint32 local_port = 1;
+    uint32 active_streams = 2;
+    map<uint64, uint32> streams_per_node = 3;
+    uint64 total_bytes_proxied = 4;
+}
+
+message StopRequest {}
+
+message StopResponse {
+    bool success = 1;
+    string message = 2;
+}
+
+// Stream of daemon events for the CLI
+message DaemonEventSubscribeRequest {}
+
+message DaemonEvent {
+    oneof event {
+        CommandSuccessEvent success = 1;
+        ErrorEvent error = 2;
+        TransferProgressEvent progress = 3;
+        BondedFetchProgressEvent bonded_progress = 4;
+    }
+}
+
+message CommandSuccessEvent {
+    string message = 1;
+}
+
+message ErrorEvent {
+    int32 code = 1;
+    string message = 2;
+}
+
+message TransferProgressEvent {
+    string manifest_id = 1;
+    float percentage = 2;
+    bool is_complete = 3;
+}
+
+// ---------------------------------------------------------
+// Bonding Messages
+// ---------------------------------------------------------
+
+// CLI -> Coordinator: "Download this URL using all available WAN links"
+message BondedFetchRequest {
+    // The URL to download
+    string url = 1;
+    // Where to save the downloaded file on the requesting node
+    string output_path = 2;
+    // Chunk size in bytes (0 = use default 1MB)
+    uint32 chunk_size = 3;
+}
+
+message BondedFetchResponse {
+    bool success = 1;
+    string manifest_id = 2;
+    uint64 total_size = 3;
+    uint32 chunk_count = 4;
+    uint32 node_count = 5;
+    string message = 6;
+}
+
+// Node -> Coordinator: report measured WAN throughput after downloading chunks
+message ChunkSpeedReport {
+    uint64 node_id = 1;
+    // Measured throughput in bytes per second
+    uint64 bytes_per_sec = 2;
+    // How many chunks this measurement is based on
+    uint32 chunks_completed = 3;
+    // The manifest this report is for
+    string manifest_id = 4;
+}
+
+// Coordinator -> Node: assign byte ranges for a bonded download
+message FetchRangeAssignment {
+    string url = 1;
+    string manifest_id = 2;
+    // The byte ranges this node should download
+    repeated ChunkRange chunks = 3;
+}
+
+message ChunkRange {
+    uint32 chunk_id = 1;
+    uint64 offset = 2;
+    uint32 size = 3;
+}
+
+// Progress event for bonded downloads (streamed to CLI)
+message BondedFetchProgressEvent {
+    string manifest_id = 1;
+    float percentage = 2;
+    bool is_complete = 3;
+    // Per-node download speed in bytes/sec
+    map<uint64, uint64> node_speeds = 4;
+    // Combined effective bandwidth in bytes/sec
+    uint64 combined_bps = 5;
+}
+

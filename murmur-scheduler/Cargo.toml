@@ -1,0 +1,13 @@
+[package]
+name = "murmur-scheduler"
+description = "Chunk scheduling and task assignment for Murmur"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+murmur-core = { path = "../murmur-core" }
+
+

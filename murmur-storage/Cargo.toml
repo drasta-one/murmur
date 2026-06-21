@@ -1,0 +1,17 @@
+[package]
+name = "murmur-storage"
+description = "Disk I/O and Chunk Storage for Murmur"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+murmur-core = { path = "../murmur-core" }
+tokio = { workspace = true, features = ["fs", "io-util", "rt"] }
+tracing = { workspace = true }
+anyhow = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3.27.0"

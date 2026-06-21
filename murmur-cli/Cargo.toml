@@ -1,0 +1,21 @@
+[package]
+name = "murmur-cli"
+description = "Command-line interface to interact with murmur-daemon"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+murmur-core = { path = "../murmur-core" }
+murmur-api = { path = "../murmur-api" }
+tokio-stream = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "net", "io-util"] }
+clap = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+uuid = { workspace = true }
