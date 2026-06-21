@@ -6,7 +6,7 @@ use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::sync::{RwLock, mpsc, oneshot};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 
 pub struct ProxyOrchestrator {
     node_id: NodeId,
@@ -14,6 +14,7 @@ pub struct ProxyOrchestrator {
     overlay: Arc<RwLock<murmur_overlay::OverlayStateTable>>,
     connections: Arc<RwLock<HashMap<NodeId, Arc<murmur_net::PeerConnection>>>>,
     // stream_id -> (Sender to write to local socks client, remote NodeId)
+    #[allow(clippy::type_complexity)]
     pub active_streams: RwLock<HashMap<u32, (mpsc::Sender<Vec<u8>>, NodeId)>>,
     // stream_id -> channel to notify when connect result arrives
     connect_waiters: RwLock<HashMap<u32, oneshot::Sender<bool>>>,
@@ -60,8 +61,8 @@ impl ProxyOrchestrator {
             .iter()
             .map(|(_, cfg)| cfg.wan_bandwidth.max(1))
             .sum();
-        let mut rng = rand::thread_rng();
-        let mut point = rng.gen_range(0..total_bw);
+        let mut rng = rand::rng();
+        let mut point = rng.random_range(0..total_bw);
 
         for (id, cfg) in active_nodes {
             let bw = cfg.wan_bandwidth.max(1);
@@ -178,7 +179,7 @@ impl ProxyOrchestrator {
             let stream_id_c = stream_id;
             tokio::spawn(async move {
                 while let Some(data) = rx.recv().await {
-                    if let Err(_) = wh.write_all(&data).await {
+                    if wh.write_all(&data).await.is_err() {
                         break;
                     }
                 }
@@ -296,7 +297,7 @@ impl ProxyOrchestrator {
                             let orch_c2 = orch.clone();
                             tokio::spawn(async move {
                                 while let Some(data) = rx.recv().await {
-                                    if let Err(_) = wh.write_all(&data).await {
+                                    if wh.write_all(&data).await.is_err() {
                                         break;
                                     }
                                 }

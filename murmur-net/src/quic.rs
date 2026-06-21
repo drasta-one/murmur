@@ -11,7 +11,7 @@ pub fn generate_self_signed_cert() -> Result<(CertificateDer<'static>, PrivateKe
     let key = cert.key_pair.serialize_der();
     let cert_der = cert.cert.der().clone();
     Ok((
-        CertificateDer::from(cert_der.into_owned()),
+        cert_der.into_owned(),
         PrivateKeyDer::try_from(key).unwrap(),
     ))
 }

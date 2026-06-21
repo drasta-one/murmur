@@ -28,7 +28,7 @@ impl ControlPlane for ControlPlaneService {
         &self,
         _request: Request<EventSubscribeRequest>,
     ) -> Result<Response<Self::StreamClusterEventsStream>, Status> {
-        let (tx, rx) = mpsc::channel(4);
+        let (_tx, rx) = mpsc::channel(4);
         Ok(Response::new(ReceiverStream::new(rx)))
     }
 
@@ -267,7 +267,7 @@ impl ControlPlane for ControlPlaneService {
                             chunks,
                         };
                         let conns = self.state.connections.read().await;
-                        for (id, conn) in conns.iter() {
+                        for (_id, conn) in conns.iter() {
                             let _ = conn.send_message(&manifest_msg).await;
                             let _ = conn.send_message(&bitfield_msg).await;
                         }
@@ -475,7 +475,7 @@ impl ControlPlane for ControlPlaneService {
                 let manifest_msg = murmur_core::net::NetMessage::ManifestData {
                     manifest: download.manifest.clone(),
                 };
-                for (node_id, _) in &per_node {
+                for node_id in per_node.keys() {
                     if *node_id != self.state.node_id {
                         if let Some(conn) = self.state.connections.read().await.get(node_id) {
                             let _ = conn.send_message(&manifest_msg).await;

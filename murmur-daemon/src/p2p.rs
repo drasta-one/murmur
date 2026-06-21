@@ -51,11 +51,11 @@ pub async fn handle_net_message(
 
             let is_new = {
                 let mut manifests = state.manifests.write().await;
-                if manifests.contains_key(&manifest.id) {
-                    false
-                } else {
-                    manifests.insert(manifest.id, manifest.clone());
+                if let std::collections::hash_map::Entry::Vacant(e) = manifests.entry(manifest.id) {
+                    e.insert(manifest.clone());
                     true
+                } else {
+                    false
                 }
             };
 

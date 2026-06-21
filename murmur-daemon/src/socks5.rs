@@ -1,5 +1,5 @@
 use crate::proxy_orchestrator::ProxyOrchestrator;
-use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::net::{Ipv4Addr, Ipv6Addr};
 use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
@@ -22,7 +22,7 @@ impl Socks5Server {
 
         loop {
             match listener.accept().await {
-                Ok((stream, peer_addr)) => {
+                Ok((stream, _peer_addr)) => {
                     let orch = self.orchestrator.clone();
                     tokio::spawn(async move {
                         if let Err(e) = handle_client(stream, orch).await {

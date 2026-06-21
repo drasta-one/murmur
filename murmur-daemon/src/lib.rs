@@ -111,7 +111,7 @@ pub async fn run_daemon(cli: Cli) -> anyhow::Result<()> {
     let state_quic_accept = state.clone();
     tokio::spawn(async move {
         while let Some(incoming) = quic_endpoint.accept().await {
-            let state_conn = state_quic_accept.clone();
+            let _state_conn = state_quic_accept.clone();
             tokio::spawn(async move {
                 if let Ok(connection) = incoming.await {
                     info!(

@@ -459,10 +459,9 @@ mod tests {
         table.merge_fragment(fragment);
 
         assert!(
-            table
+            !table
                 .chunk_ownership
-                .get(&murmur_core::types::ChunkId(1))
-                .is_none()
+                .contains_key(&murmur_core::types::ChunkId(1))
         );
     }
 }

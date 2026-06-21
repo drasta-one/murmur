@@ -3,7 +3,6 @@
 //! Provides the `NodeThroughput` sliding window tracker and `optimal_chunk_size` calculation.
 
 use murmur_core::types::NodeId;
-use tracing::warn;
 
 /// Default granular chunk size in bytes (512 KB).
 pub const GRANULAR_CHUNK_SIZE: u64 = 524_288;
@@ -54,7 +53,7 @@ impl NodeThroughput {
         let batch_size = batch_size.clamp(GRANULAR_CHUNK_SIZE, MAX_BATCH_SIZE);
 
         // Round to nearest granular chunk size
-        let num_chunks = (batch_size + GRANULAR_CHUNK_SIZE - 1) / GRANULAR_CHUNK_SIZE;
+        let num_chunks = batch_size.div_ceil(GRANULAR_CHUNK_SIZE);
         num_chunks * GRANULAR_CHUNK_SIZE
     }
 

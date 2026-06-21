@@ -1,6 +1,5 @@
 use clap::{Parser, Subcommand};
-use murmur_api::{DorRuntime, ErrorCode, MurmurCommand, MurmurConfig, MurmurEvent};
-use murmur_core::types::ManifestId;
+use murmur_api::{DorRuntime, MurmurCommand, MurmurConfig, MurmurEvent};
 use tokio_stream::StreamExt;
 
 #[derive(Parser)]
@@ -129,13 +128,10 @@ async fn main() -> anyhow::Result<()> {
                 })
                 .await?;
 
-            let mut downloading = false;
-
             while let Some(event) = events.next().await {
                 match event {
                     MurmurEvent::CommandSuccess { message } => {
                         println!("{}", message);
-                        downloading = true;
                     }
                     MurmurEvent::TransferProgress {
                         percentage,
@@ -165,13 +161,10 @@ async fn main() -> anyhow::Result<()> {
                 })
                 .await?;
 
-            let mut downloading = false;
-
             while let Some(event) = events.next().await {
                 match event {
                     MurmurEvent::CommandSuccess { message } => {
                         println!("{}", message);
-                        downloading = true;
                     }
                     MurmurEvent::BondedFetchProgress {
                         percentage,
@@ -195,7 +188,7 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
         }
-        Commands::Progress { manifest_id } => {
+        Commands::Progress { manifest_id: _ } => {
             // Note: The CLI could just connect, get the current progress, and exit.
             // Wait, StartDownload starts the loop for Progress in the server.
             // If the user manually asks for Progress, maybe they want a single snapshot?

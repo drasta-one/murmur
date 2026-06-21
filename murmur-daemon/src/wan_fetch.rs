@@ -131,12 +131,9 @@ pub async fn fetch_and_hash(
 
     let hash = blake3::hash(&data);
 
-    let throughput_bps = if elapsed_ms > 0 {
-        (data.len() as u64 * 1000) / elapsed_ms
-    } else {
-        // Sub-millisecond download — assume instantaneous
-        data.len() as u64 * 1_000_000
-    };
+    let throughput_bps = (data.len() as u64 * 1000)
+        .checked_div(elapsed_ms)
+        .unwrap_or(data.len() as u64 * 1_000_000);
 
     debug!(
         offset = offset,
@@ -233,11 +230,9 @@ pub async fn fetch_ranges_concurrent(
 
             match fetch_res {
                 Ok(data) => {
-                    let throughput_bps = if elapsed_ms > 0 {
-                        (data.len() as u64 * 1000) / elapsed_ms
-                    } else {
-                        data.len() as u64 * 1_000_000
-                    };
+                    let throughput_bps = (data.len() as u64 * 1000)
+                        .checked_div(elapsed_ms)
+                        .unwrap_or(data.len() as u64 * 1_000_000);
 
                     let mut cursor = 0;
                     for &(id, _offset, size) in &block {

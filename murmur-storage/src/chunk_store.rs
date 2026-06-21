@@ -2,7 +2,6 @@ use murmur_core::manifest::Manifest;
 use murmur_core::types::{ChunkId, ManifestId};
 use std::path::{Path, PathBuf};
 use tokio::fs::{self, File};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tracing::info;
 
 pub struct ChunkStore {
@@ -61,6 +60,7 @@ impl ChunkStore {
             use std::os::unix::fs::FileExt;
             let file = std::fs::OpenOptions::new()
                 .create(true)
+                .truncate(false)
                 .write(true)
                 .open(&path_clone)?;
             file.write_at(&data, offset)?;

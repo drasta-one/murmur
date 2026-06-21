@@ -8,11 +8,10 @@
 use std::collections::HashMap;
 use std::time::Instant;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 use murmur_core::manifest::Manifest;
 use murmur_core::node::NodeConfig;
 use murmur_core::types::{ChunkId, ManifestId, NodeId};
-use murmur_scheduler::strategy::{BandwidthWeightedStrategy, ChunkAssignment, SchedulingStrategy};
 use tracing::{debug, error, info, warn};
 
 use crate::url_manifest::{self, DEFAULT_BONDED_CHUNK_SIZE, UrlResourceInfo};
@@ -292,7 +291,7 @@ pub async fn execute_local_fetch(
                     chunk_id: ChunkId(chunk_id),
                 };
                 let conns = state.connections.read().await;
-                for (id, conn) in conns.iter() {
+                for (_id, conn) in conns.iter() {
                     let _ = conn.send_message(&msg).await;
                 }
 
@@ -474,8 +473,8 @@ pub fn handle_request_more_work(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use murmur_core::chunk::ChunkMeta;
-    use murmur_core::types::SimTime;
+    
+    
 
     fn make_test_manifest(total_size: u64, chunk_size: u32) -> Manifest {
         let info = UrlResourceInfo {

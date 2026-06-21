@@ -103,7 +103,7 @@ impl CoordinatorLifecycle {
     pub fn start_election(&mut self, at: SimTime) {
         // If a coordinator was active, record their death
         if let CoordinatorState::Active {
-            coordinator, since, ..
+            coordinator, since: _, ..
         } = &self.state
         {
             if let Some(record) = self.history.last_mut() {
@@ -174,7 +174,7 @@ impl CoordinatorLifecycle {
         } = &self.state
         {
             let previous = *coordinator;
-            let elected_at = *since;
+            let _elected_at = *since;
 
             // Update the history record with duration
             if let Some(record) = self.history.last_mut() {
