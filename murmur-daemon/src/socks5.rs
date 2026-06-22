@@ -15,7 +15,7 @@ impl Socks5Server {
         Self { port, orchestrator }
     }
 
-    pub async fn run(self) -> anyhow::Result<()> {
+    pub async fn run(self) -> Result<(), crate::error::DaemonError> {
         let addr = format!("127.0.0.1:{}", self.port);
         let listener = TcpListener::bind(&addr).await?;
         info!("SOCKS5 Proxy listening on {}", addr);
@@ -41,12 +41,15 @@ impl Socks5Server {
 async fn handle_client(
     mut stream: TcpStream,
     orchestrator: Arc<ProxyOrchestrator>,
-) -> anyhow::Result<()> {
+) -> Result<(), crate::error::DaemonError> {
     // 1. Handshake
     let mut header = [0u8; 2];
     stream.read_exact(&mut header).await?;
     if header[0] != 0x05 {
-        anyhow::bail!("Invalid SOCKS version: {}", header[0]);
+        return Err(crate::error::DaemonError::Socks5(format!(
+            "Invalid SOCKS version: {}",
+            header[0]
+        )));
     }
 
     let num_methods = header[1] as usize;
@@ -61,7 +64,9 @@ async fn handle_client(
     stream.read_exact(&mut req_header).await?;
     if req_header[0] != 0x05 || req_header[1] != 0x01 || req_header[2] != 0x00 {
         // We only support CONNECT (0x01)
-        anyhow::bail!("Unsupported SOCKS request or command");
+        return Err(crate::error::DaemonError::Socks5(
+            "Unsupported SOCKS request or command".to_string(),
+        ));
     }
 
     let atyp = req_header[3];
@@ -96,7 +101,12 @@ async fn handle_client(
             let port = u16::from_be_bytes(port_bytes);
             (Ipv6Addr::from(ip).to_string(), port)
         }
-        _ => anyhow::bail!("Unsupported address type: {}", atyp),
+        _ => {
+            return Err(crate::error::DaemonError::Socks5(format!(
+                "Unsupported address type: {}",
+                atyp
+            )));
+        }
     };
 
     debug!("SOCKS5 CONNECT request for {}:{}", host, port);

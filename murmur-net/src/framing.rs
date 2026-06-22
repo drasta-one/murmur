@@ -1,12 +1,15 @@
+use crate::error::NetError;
 use bytes::{Buf, BufMut, BytesMut};
 use serde::{Deserialize, Serialize};
-// As a placeholder, we might use MessagePayload directly later
+
+/// Maximum message size to prevent unbounded memory allocation (16 MB)
+
 
 /// A length-prefixed frame codec for postcard.
 pub struct PostcardCodec;
 
 impl PostcardCodec {
-    pub fn encode<T: Serialize>(item: &T, dst: &mut BytesMut) -> anyhow::Result<()> {
+    pub fn encode<T: Serialize>(item: &T, dst: &mut BytesMut) -> Result<(), NetError> {
         let serialized = postcard::to_allocvec(item)?;
         let len = serialized.len() as u32;
 
@@ -17,7 +20,7 @@ impl PostcardCodec {
         Ok(())
     }
 
-    pub fn decode<T: for<'de> Deserialize<'de>>(src: &mut BytesMut) -> anyhow::Result<Option<T>> {
+    pub fn decode<T: for<'de> Deserialize<'de>>(src: &mut BytesMut) -> Result<Option<T>, NetError> {
         if src.len() < 4 {
             return Ok(None);
         }

@@ -1,5 +1,6 @@
 pub mod connection;
 pub mod discovery;
+pub mod error;
 pub mod framing;
 pub mod quic;
 

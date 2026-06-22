@@ -43,7 +43,7 @@ impl PeerConnection {
         }
     }
 
-    pub async fn send_message(&self, message: &NetMessage) -> anyhow::Result<()> {
+    pub async fn send_message(&self, message: &NetMessage) -> Result<(), crate::error::NetError> {
         let mut buf = BytesMut::new();
         PostcardCodec::encode(message, &mut buf)?;
 

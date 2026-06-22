@@ -1,4 +1,4 @@
-use anyhow::Result;
+use crate::error::NetError;
 use quinn::crypto::rustls::{QuicClientConfig, QuicServerConfig};
 use quinn::{ClientConfig, Endpoint, ServerConfig};
 use rustls::pki_types::{CertificateDer, PrivateKeyDer};
@@ -6,11 +6,18 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 /// Generates a self-signed TOFU certificate for QUIC.
-pub fn generate_self_signed_cert() -> Result<(CertificateDer<'static>, PrivateKeyDer<'static>)> {
+pub fn generate_self_signed_cert()
+-> Result<(CertificateDer<'static>, PrivateKeyDer<'static>), NetError> {
     let cert = rcgen::generate_simple_self_signed(vec!["localhost".into()])?;
     let key = cert.key_pair.serialize_der();
     let cert_der = cert.cert.der().clone();
-    Ok((cert_der.into_owned(), PrivateKeyDer::try_from(key).unwrap()))
+    let private_key = PrivateKeyDer::try_from(key).map_err(|_| {
+        std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "Failed to parse private key",
+        )
+    })?;
+    Ok((cert_der.into_owned(), private_key))
 }
 
 /// A dummy verifier that accepts any certificate (TOFU/P2P model)
@@ -57,7 +64,7 @@ impl rustls::client::danger::ServerCertVerifier for SkipServerVerification {
     }
 }
 
-pub fn make_quic_endpoint(bind_addr: SocketAddr) -> Result<Endpoint> {
+pub fn make_quic_endpoint(bind_addr: SocketAddr) -> Result<Endpoint, NetError> {
     rustls::crypto::ring::default_provider()
         .install_default()
         .ok();
@@ -94,7 +101,7 @@ mod tests {
     use tokio::time::{Duration, sleep};
 
     #[tokio::test]
-    async fn test_quic_connection() -> Result<()> {
+    async fn test_quic_connection() -> Result<(), NetError> {
         let server_addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
         let server_endpoint = make_quic_endpoint(server_addr)?;
         let bound_addr = server_endpoint.local_addr()?;
@@ -121,11 +128,11 @@ mod tests {
         let connection = client_endpoint.connect(bound_addr, "localhost")?.await?;
         let (mut send, mut recv) = connection.open_bi().await?;
 
-        send.write_all(b"helloworld").await?;
-        send.finish()?;
+        send.write_all(b"helloworld").await.unwrap();
+        send.finish().unwrap();
 
         let mut buf = [0u8; 10];
-        recv.read_exact(&mut buf).await?;
+        recv.read_exact(&mut buf).await.unwrap();
         assert_eq!(&buf, b"helloworld");
 
         server_task.await?;

@@ -38,7 +38,7 @@ impl NodeState {
         malicious: bool,
         slow_loris: bool,
         wan_bandwidth: u64,
-    ) -> anyhow::Result<Self> {
+    ) -> Result<Self, crate::error::DaemonError> {
         let config = murmur_core::cluster::ClusterConfig::default();
         let overlay = OverlayStateTable::new(config);
         let coordinator = CoordinatorLifecycle::new();

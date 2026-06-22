@@ -8,7 +8,7 @@
 use std::collections::HashMap;
 use std::time::Instant;
 
-use anyhow::{Context, Result};
+use crate::error::DaemonError;
 use murmur_core::manifest::Manifest;
 use murmur_core::node::NodeConfig;
 use murmur_core::types::{ChunkId, ManifestId, NodeId};
@@ -233,11 +233,10 @@ pub async fn execute_local_fetch(
     manifest_id: ManifestId,
     state: std::sync::Arc<crate::state::NodeState>,
     max_concurrent: usize,
-) -> Result<Vec<wan_fetch::FetchResult>> {
+) -> Result<Vec<wan_fetch::FetchResult>, DaemonError> {
     let client = reqwest::Client::builder()
         .user_agent("DOR-Runtime/0.1")
-        .build()
-        .context("failed to build HTTP client")?;
+        .build()?;
 
     info!(
         url = url,
@@ -269,8 +268,8 @@ pub async fn execute_local_fetch(
                 let offset = assignments
                     .iter()
                     .find(|(id, _, _)| id.0 == chunk_id)
-                    .unwrap()
-                    .1;
+                    .map(|(_, o, _)| *o)
+                    .unwrap_or(0);
 
                 // Store the chunk to disk
                 state
@@ -367,7 +366,7 @@ pub async fn initiate_bonded_download(
     requester_id: NodeId,
     nodes: &[(NodeId, NodeConfig)],
     chunk_size: Option<u32>,
-) -> Result<(BondedDownload, HashMap<NodeId, Vec<(ChunkId, u64, u32)>>)> {
+) -> Result<(BondedDownload, HashMap<NodeId, Vec<(ChunkId, u64, u32)>>), DaemonError> {
     // Step 1: Probe the URL
     let url_info = url_manifest::probe_url(url).await?;
 

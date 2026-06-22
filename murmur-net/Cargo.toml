@@ -14,7 +14,7 @@ mdns-sd = { workspace = true }
 postcard = { workspace = true }
 serde = { workspace = true }
 tracing = { workspace = true }
-anyhow = { workspace = true }
+thiserror = { workspace = true }
 bytes = "1"
 quinn = "0.11.2"
 rustls = "0.23"

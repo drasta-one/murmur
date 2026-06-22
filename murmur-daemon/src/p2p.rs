@@ -234,15 +234,19 @@ pub async fn handle_net_message(
                                 .cloned()
                         {
                             info!("Download complete! Reassembling to {}", dest);
-                            let manifest = state
-                                .manifests
-                                .read()
-                                .await
-                                .get(&manifest_id)
-                                .cloned()
-                                .unwrap();
-                            if let Err(e) = state.storage.reassemble_file(&manifest, &dest).await {
-                                tracing::error!("Failed to reassemble file: {}", e);
+                            if let Some(manifest) =
+                                state.manifests.read().await.get(&manifest_id).cloned()
+                            {
+                                if let Err(e) =
+                                    state.storage.reassemble_file(&manifest, &dest).await
+                                {
+                                    tracing::error!("Failed to reassemble file: {}", e);
+                                }
+                            } else {
+                                tracing::error!(
+                                    "Manifest {} not found during reassembly",
+                                    manifest_id.0
+                                );
                             }
                         }
                     } else {

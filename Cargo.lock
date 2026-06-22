@@ -1175,7 +1175,6 @@ dependencies = [
 name = "murmur-daemon"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "blake3",
  "bytes",
  "clap",
@@ -1192,6 +1191,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "thiserror 2.0.18",
  "tokio",
  "tokio-stream",
  "tonic",
@@ -1204,7 +1204,6 @@ dependencies = [
 name = "murmur-net"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "bytes",
  "mdns-sd",
  "murmur-core",
@@ -1213,6 +1212,7 @@ dependencies = [
  "rcgen",
  "rustls",
  "serde",
+ "thiserror 2.0.18",
  "tokio",
  "tracing",
 ]
@@ -1248,11 +1248,12 @@ dependencies = [
 name = "murmur-storage"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "murmur-core",
  "tempfile",
+ "thiserror 2.0.18",
  "tokio",
  "tracing",
+ "uuid",
 ]
 
 [[package]]

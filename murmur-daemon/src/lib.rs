@@ -1,4 +1,5 @@
 pub mod bonded_download;
+pub mod error;
 mod event_loop;
 mod grpc;
 mod p2p;
@@ -57,7 +58,7 @@ pub struct Cli {
     pub socks5_port: u16,
 }
 
-pub async fn run_daemon(cli: Cli) -> anyhow::Result<()> {
+pub async fn run_daemon(cli: Cli) -> Result<(), crate::error::DaemonError> {
     // Generate a random Node ID for this daemon
     let node_id = NodeId(rand::random::<u64>());
     info!("Starting murmur-daemon with Node ID {}", node_id.0);

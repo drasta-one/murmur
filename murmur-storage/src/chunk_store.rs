@@ -1,3 +1,4 @@
+use crate::error::StorageError;
 use murmur_core::manifest::Manifest;
 use murmur_core::types::{ChunkId, ManifestId};
 use std::path::{Path, PathBuf};
@@ -9,7 +10,7 @@ pub struct ChunkStore {
 }
 
 impl ChunkStore {
-    pub async fn new(base_dir: impl AsRef<Path>) -> anyhow::Result<Self> {
+    pub async fn new(base_dir: impl AsRef<Path>) -> Result<Self, StorageError> {
         let storage_dir = base_dir.as_ref().join("chunks");
         fs::create_dir_all(&storage_dir).await?;
         Ok(Self { storage_dir })
@@ -31,7 +32,7 @@ impl ChunkStore {
         &self,
         manifest_id: ManifestId,
         total_size: u64,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), StorageError> {
         let path = self.file_path(manifest_id);
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).await?;
@@ -47,7 +48,7 @@ impl ChunkStore {
         id: ChunkId,
         data: &[u8],
         offset: u64,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), StorageError> {
         let path = self.file_path(manifest_id);
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).await?;
@@ -64,7 +65,7 @@ impl ChunkStore {
                 .write(true)
                 .open(&path_clone)?;
             file.write_at(&data, offset)?;
-            Ok::<(), anyhow::Error>(())
+            Ok::<(), std::io::Error>(())
         })
         .await??;
 
@@ -81,7 +82,7 @@ impl ChunkStore {
         id: ChunkId,
         offset: u64,
         size: u32,
-    ) -> anyhow::Result<Option<Vec<u8>>> {
+    ) -> Result<Option<Vec<u8>>, StorageError> {
         if !self.has_chunk(manifest_id, id).await {
             return Ok(None);
         }
@@ -94,7 +95,7 @@ impl ChunkStore {
             let file = std::fs::File::open(&path_clone)?;
             let mut buf = vec![0u8; size as usize];
             file.read_exact_at(&mut buf, offset)?;
-            Ok::<Vec<u8>, anyhow::Error>(buf)
+            Ok::<Vec<u8>, std::io::Error>(buf)
         })
         .await??;
 
@@ -119,7 +120,7 @@ impl ChunkStore {
         &self,
         manifest: &Manifest,
         out_path: impl AsRef<Path>,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), StorageError> {
         if manifest.total_size == 0 {
             File::create(out_path).await?;
             info!(
@@ -131,7 +132,7 @@ impl ChunkStore {
 
         let path = self.file_path(manifest.id);
         if !path.exists() {
-            anyhow::bail!("Data file missing for manifest {}", manifest.id.0);
+            return Err(StorageError::DataFileMissing(manifest.id.0));
         }
         fs::copy(&path, out_path).await?;
         info!(

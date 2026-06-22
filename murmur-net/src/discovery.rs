@@ -20,7 +20,7 @@ pub struct Discovery {
 }
 
 impl Discovery {
-    pub fn new(node_id: u64) -> anyhow::Result<Self> {
+    pub fn new(node_id: u64) -> Result<Self, crate::error::NetError> {
         let daemon = ServiceDaemon::new()?;
         Ok(Self {
             daemon,
@@ -29,7 +29,7 @@ impl Discovery {
         })
     }
 
-    pub fn start_broadcasting(&self, port: u16) -> anyhow::Result<()> {
+    pub fn start_broadcasting(&self, port: u16) -> Result<(), crate::error::NetError> {
         let instance_name = format!("murmur-node-{}", self.node_id);
         let host_name = format!("{}.local.", instance_name);
 
@@ -52,7 +52,7 @@ impl Discovery {
         Ok(())
     }
 
-    pub fn start_browsing(&self) -> anyhow::Result<mpsc::Receiver<PeerEvent>> {
+    pub fn start_browsing(&self) -> Result<mpsc::Receiver<PeerEvent>, crate::error::NetError> {
         let receiver = self.daemon.browse(DOR_SERVICE_TYPE)?;
         let (tx, rx) = mpsc::channel(100);
         let peers = self.peers.clone();

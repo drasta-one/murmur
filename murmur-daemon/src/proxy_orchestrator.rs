@@ -80,7 +80,7 @@ impl ProxyOrchestrator {
         mut client_stream: TcpStream,
         host: String,
         port: u16,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), crate::error::DaemonError> {
         let (node_id, bw) = self.select_node().await.unwrap_or((self.node_id, 0));
         info!(
             "SOCKS5 routing {}:{} via Node {} (BW: {} Mbps)",
@@ -141,7 +141,9 @@ impl ProxyOrchestrator {
             if let Some(conn) = self.connections.read().await.get(&node_id) {
                 conn.send_message(&msg).await?;
             } else {
-                anyhow::bail!("Connection to chosen proxy node lost");
+                return Err(crate::error::DaemonError::Proxy(
+                    "Connection to chosen proxy node lost".to_string(),
+                ));
             }
 
             // Wait for ProxyConnectResult
@@ -151,7 +153,9 @@ impl ProxyOrchestrator {
                     _ => {
                         self.active_streams.write().await.remove(&stream_id);
                         self.connect_waiters.write().await.remove(&stream_id);
-                        anyhow::bail!("Timeout waiting for ProxyConnectResult");
+                        return Err(crate::error::DaemonError::Proxy(
+                            "Timeout waiting for ProxyConnectResult".to_string(),
+                        ));
                     }
                 };
 

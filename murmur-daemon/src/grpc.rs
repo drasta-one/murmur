@@ -176,7 +176,15 @@ impl ControlPlane for ControlPlaneService {
 
         match tokio::fs::File::open(path).await {
             Ok(mut file) => {
-                let filename = path.file_name().unwrap().to_string_lossy().to_string();
+                let filename = match path.file_name() {
+                    Some(name) => name.to_string_lossy().to_string(),
+                    None => {
+                        return Ok(Response::new(SeedResponse {
+                            success: false,
+                            message: "Invalid file path".into(),
+                        }));
+                    }
+                };
                 let chunk_size = 1024 * 1024; // 1 MB chunks
 
                 let source = murmur_core::manifest::ManifestSource::LocalFile {
@@ -197,14 +205,16 @@ impl ControlPlane for ControlPlaneService {
                             manifest.chunks.len()
                         );
 
-                        let mut file = tokio::fs::File::open(path).await.unwrap();
+                        let mut file = tokio::fs::File::open(path)
+                            .await
+                            .map_err(|e| Status::internal(e.to_string()))?;
                         let mut buffer = vec![0u8; chunk_size as usize];
 
                         self.state
                             .storage
                             .preallocate(manifest.id, manifest.total_size)
                             .await
-                            .unwrap();
+                            .map_err(|e| Status::internal(e.to_string()))?;
 
                         for chunk_meta in &manifest.chunks {
                             let mut read_bytes = 0;
@@ -212,7 +222,7 @@ impl ControlPlane for ControlPlaneService {
                                 let n = file
                                     .read(&mut buffer[read_bytes..(chunk_meta.size as usize)])
                                     .await
-                                    .unwrap();
+                                    .map_err(|e| Status::internal(e.to_string()))?;
                                 if n == 0 {
                                     break;
                                 }
@@ -228,7 +238,7 @@ impl ControlPlane for ControlPlaneService {
                                     chunk_meta.offset,
                                 )
                                 .await
-                                .unwrap();
+                                .map_err(|e| Status::internal(e.to_string()))?;
                         }
 
                         self.state
@@ -469,7 +479,7 @@ impl ControlPlane for ControlPlaneService {
                     .storage
                     .preallocate(manifest_id, total_size)
                     .await
-                    .unwrap();
+                    .map_err(|e| Status::internal(e.to_string()))?;
 
                 // Broadcast ManifestData to peers participating in the download
                 let manifest_msg = murmur_core::net::NetMessage::ManifestData {

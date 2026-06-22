@@ -4,7 +4,7 @@
 //! where each chunk corresponds to an HTTP byte range. This is the bridge
 //! between "download this URL" and DOR's chunk-based transfer model.
 
-use anyhow::{Context, Result, bail};
+use crate::error::DaemonError;
 use murmur_core::chunk::ChunkMeta;
 use murmur_core::manifest::Manifest;
 use murmur_core::types::{ChunkId, ManifestId, SimTime};
@@ -43,17 +43,17 @@ pub struct UrlResourceInfo {
 }
 
 /// Probe a URL via HTTP HEAD to learn its size and range support.
-pub async fn probe_url(url: &str) -> Result<UrlResourceInfo> {
+pub async fn probe_url(url: &str) -> Result<UrlResourceInfo, DaemonError> {
     let client = reqwest::Client::builder()
         .user_agent("DOR-Runtime/0.1")
         .build()
-        .context("failed to build HTTP client")?;
+        .map_err(|e| DaemonError::Fetch(format!("failed to build HTTP client: {}", e)))?;
 
     let response = client
         .head(url)
         .send()
         .await
-        .context("HTTP HEAD request failed")?;
+        .map_err(|e| DaemonError::Fetch(format!("HTTP HEAD request failed: {}", e)))?;
 
     if response.status().is_redirection() || response.status() == reqwest::StatusCode::UNAUTHORIZED
     {
@@ -69,11 +69,11 @@ pub async fn probe_url(url: &str) -> Result<UrlResourceInfo> {
     }
 
     if !response.status().is_success() {
-        bail!(
-            "HTTP HEAD returned status {}: {}",
+        return Err(DaemonError::Fetch(format!(
+            "HTTP HEAD failed with status {}: {}",
             response.status().as_u16(),
             response.status().canonical_reason().unwrap_or("unknown")
-        );
+        )));
     }
 
     let headers = response.headers();
@@ -86,7 +86,9 @@ pub async fn probe_url(url: &str) -> Result<UrlResourceInfo> {
         .unwrap_or(0);
 
     if total_size == 0 {
-        bail!("Server did not return Content-Length; cannot create bonded manifest");
+        return Err(DaemonError::Fetch(
+            "Server did not return Content-Length; cannot create bonded manifest".to_string(),
+        ));
     }
 
     let supports_ranges = headers
